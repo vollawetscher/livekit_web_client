@@ -87,9 +87,9 @@ export class AudioRecorder {
     };
 
     source.connect(this.processor);
-    // Note: NOT connecting processor to destination to prevent echo cancellation conflicts
+    this.processor.connect(this.audioContext.destination);
 
-    console.log('🎤 Audio recording started');
+    console.log('🎤 Audio recording started with processor connected to destination');
   }
 
   stop(): void {
