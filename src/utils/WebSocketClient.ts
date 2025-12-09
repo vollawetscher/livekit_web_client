@@ -4,6 +4,7 @@ export class WebSocketClient {
   private ws: WebSocket | null = null;
   private onLogMessage: (msg: string) => void;
   private onAudioReceived?: () => void;
+  private isReady = false;
 
   constructor(url: string, token: string, onLogMessage: (msg: string) => void, onAudioReceived?: () => void) {
     this.url = url;
@@ -22,18 +23,22 @@ export class WebSocketClient {
 
         this.send({
           event: 'start',
-          userId: 'test-user',
-          deviceId: 'web-test',
           callId: 'test-' + Date.now(),
+          metadata: {},
         });
 
-        resolve();
+        this.onLogMessage('Waiting for server ready...');
       };
 
       this.ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
 
-        if (data.event === 'audio') {
+        if (data.event === 'ready') {
+          console.log('🟢 Server ready');
+          this.onLogMessage('Server ready - can send audio now');
+          this.isReady = true;
+          resolve();
+        } else if (data.event === 'audio') {
           this.playAudio(data.audio);
         } else if (data.event === 'transcript') {
           console.log('📝 Transcript:', data.text);
@@ -61,7 +66,7 @@ export class WebSocketClient {
   }
 
   sendAudio(audioData: ArrayBuffer): void {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN && this.isReady) {
       const base64 = btoa(String.fromCharCode(...new Uint8Array(audioData)));
       this.send({
         event: 'media',
@@ -110,5 +115,6 @@ export class WebSocketClient {
       this.ws.close();
       this.ws = null;
     }
+    this.isReady = false;
   }
 }
