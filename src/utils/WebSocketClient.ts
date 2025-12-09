@@ -6,11 +6,11 @@ export class WebSocketClient {
   private onAudioReceived?: () => void;
   private isReady = false;
 
-  // Audio playback queue system
+  // Audio playback queue system with precise timing
   private audioContext: AudioContext | null = null;
   private audioQueue: AudioBuffer[] = [];
-  private isPlaying = false;
-  private currentSource: AudioBufferSourceNode | null = null;
+  private nextPlayTime = 0;
+  private scheduledSources: AudioBufferSourceNode[] = [];
 
   // Debugging
   private audioSentCount = 0;
@@ -135,6 +135,11 @@ export class WebSocketClient {
       return;
     }
 
+    // Resume audio context if suspended
+    if (this.audioContext.state === 'suspended') {
+      this.audioContext.resume();
+    }
+
     // Decode base64 to bytes
     const binaryString = atob(base64Audio);
     const bytes = new Uint8Array(binaryString.length);
@@ -150,61 +155,48 @@ export class WebSocketClient {
       channelData[i] = this.mulawToLinear(bytes[i]) / 32768.0;
     }
 
-    // Add to queue and start playback if not already playing
-    this.audioQueue.push(audioBuffer);
-    console.log(`🎵 Audio chunk queued (queue size: ${this.audioQueue.length})`);
-
-    if (!this.isPlaying) {
-      this.playNextInQueue();
-    }
-  }
-
-  private playNextInQueue(): void {
-    if (this.audioQueue.length === 0) {
-      this.isPlaying = false;
-      console.log('✅ Audio queue empty - playback complete');
-      return;
-    }
-
-    if (!this.audioContext) {
-      console.error('AudioContext not initialized');
-      return;
-    }
-
-    this.isPlaying = true;
-    const audioBuffer = this.audioQueue.shift()!;
-
-    console.log(`▶️ Playing audio chunk (${this.audioQueue.length} remaining in queue)`);
-
-    // Create and configure audio source
+    // Schedule audio chunk for seamless playback
     const source = this.audioContext.createBufferSource();
     source.buffer = audioBuffer;
     source.connect(this.audioContext.destination);
 
-    // Play next chunk when this one finishes
+    // Calculate when to start this chunk
+    const currentTime = this.audioContext.currentTime;
+    const startTime = Math.max(currentTime, this.nextPlayTime);
+
+    // Schedule playback
+    source.start(startTime);
+
+    // Update next play time for seamless chaining
+    this.nextPlayTime = startTime + audioBuffer.duration;
+
+    // Clean up after playback
     source.onended = () => {
-      this.currentSource = null;
-      this.playNextInQueue();
+      const index = this.scheduledSources.indexOf(source);
+      if (index > -1) {
+        this.scheduledSources.splice(index, 1);
+      }
     };
 
-    this.currentSource = source;
-    source.start();
+    this.scheduledSources.push(source);
+
+    console.log(`🎵 Audio scheduled at ${startTime.toFixed(3)}s, duration: ${audioBuffer.duration.toFixed(3)}s, next: ${this.nextPlayTime.toFixed(3)}s`);
   }
 
   clearAudioQueue(): void {
-    // Stop current playback
-    if (this.currentSource) {
+    // Stop all scheduled sources
+    for (const source of this.scheduledSources) {
       try {
-        this.currentSource.stop();
+        source.stop();
       } catch (e) {
         // Ignore if already stopped
       }
-      this.currentSource = null;
     }
 
-    // Clear queue
+    // Clear state
+    this.scheduledSources = [];
     this.audioQueue = [];
-    this.isPlaying = false;
+    this.nextPlayTime = 0;
     console.log('🧹 Audio queue cleared');
   }
 
@@ -221,7 +213,9 @@ export class WebSocketClient {
   getStatus(): string {
     const wsState = this.ws ? ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][this.ws.readyState] : 'NULL';
     const contextState = this.audioContext?.state || 'NULL';
-    return `WebSocket: ${wsState}, Server Ready: ${this.isReady}, AudioContext: ${contextState}, Queue: ${this.audioQueue.length}, Playing: ${this.isPlaying}, Sent: ${this.audioSentCount}`;
+    const currentTime = this.audioContext?.currentTime.toFixed(2) || '0';
+    const nextPlay = this.nextPlayTime.toFixed(2);
+    return `WebSocket: ${wsState}, Server Ready: ${this.isReady}, AudioContext: ${contextState}, Scheduled: ${this.scheduledSources.length}, CurrentTime: ${currentTime}s, NextPlay: ${nextPlay}s, Sent: ${this.audioSentCount}`;
   }
 
   logStatus(): void {
