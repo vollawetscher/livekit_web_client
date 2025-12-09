@@ -143,7 +143,7 @@ export class WebSocketClient {
     }
 
     // Create audio buffer from mulaw-encoded bytes
-    const audioBuffer = this.audioContext.createBuffer(1, bytes.length / 2, 8000);
+    const audioBuffer = this.audioContext.createBuffer(1, bytes.length, 8000);
     const channelData = audioBuffer.getChannelData(0);
 
     for (let i = 0; i < bytes.length; i++) {
