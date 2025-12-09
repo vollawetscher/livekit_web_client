@@ -34,7 +34,21 @@ export class WebSocketClient {
     }
 
     return new Promise((resolve, reject) => {
-      this.ws = new WebSocket(`${this.url}?token=${this.token}`);
+      const connectionTimeout = setTimeout(() => {
+        if (this.ws && this.ws.readyState !== WebSocket.OPEN) {
+          this.ws.close();
+          reject(new Error('Connection timeout - server did not respond'));
+        }
+      }, 10000); // 10 second timeout
+
+      try {
+        this.ws = new WebSocket(`${this.url}?token=${this.token}`);
+      } catch (error) {
+        clearTimeout(connectionTimeout);
+        const errorMsg = error instanceof Error ? error.message : 'Invalid WebSocket URL';
+        reject(new Error(`Failed to create WebSocket: ${errorMsg}`));
+        return;
+      }
 
       this.ws.onopen = () => {
         console.log('✅ WebSocket connected');
@@ -50,35 +64,67 @@ export class WebSocketClient {
       };
 
       this.ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
+        try {
+          const data = JSON.parse(event.data);
 
-        console.log(`📨 [WebSocketClient] Received event: ${data.event}`);
+          console.log(`📨 [WebSocketClient] Received event: ${data.event}`);
 
-        if (data.event === 'ready') {
-          console.log('🟢 Server ready');
-          this.onLogMessage('Server ready - can send audio now');
-          this.isReady = true;
-          resolve();
-        } else if (data.event === 'audio') {
-          console.log(`🔊 [WebSocketClient] Received audio chunk (${data.audio?.length} bytes)`);
-          this.playAudio(data.audio);
-        } else if (data.event === 'transcript') {
-          console.log('📝 Transcript:', data.text);
-          this.onLogMessage('Transcript: ' + data.text);
-        } else {
-          console.log(`⚠️ [WebSocketClient] Unknown event: ${data.event}`, data);
+          if (data.event === 'ready') {
+            console.log('🟢 Server ready');
+            this.onLogMessage('Server ready - can send audio now');
+            this.isReady = true;
+            clearTimeout(connectionTimeout);
+            resolve();
+          } else if (data.event === 'error') {
+            console.error('❌ Server error:', data.message);
+            this.onLogMessage(`Server error: ${data.message}`);
+            clearTimeout(connectionTimeout);
+            reject(new Error(data.message || 'Server reported an error'));
+          } else if (data.event === 'audio') {
+            console.log(`🔊 [WebSocketClient] Received audio chunk (${data.audio?.length} bytes)`);
+            this.playAudio(data.audio);
+          } else if (data.event === 'transcript') {
+            console.log('📝 Transcript:', data.text);
+            this.onLogMessage('Transcript: ' + data.text);
+          } else {
+            console.log(`⚠️ [WebSocketClient] Unknown event: ${data.event}`, data);
+          }
+        } catch (error) {
+          console.error('❌ Error parsing message:', error);
         }
       };
 
       this.ws.onerror = (error) => {
         console.error('❌ WebSocket error:', error);
-        this.onLogMessage('WebSocket error');
-        reject(error);
+        this.onLogMessage('WebSocket connection error');
+        clearTimeout(connectionTimeout);
+        // WebSocket errors don't provide useful info, so we give a generic message
+        reject(new Error('Connection failed - check server URL and network connection'));
       };
 
-      this.ws.onclose = () => {
-        console.log('🔌 WebSocket disconnected');
-        this.onLogMessage('WebSocket disconnected');
+      this.ws.onclose = (event) => {
+        console.log(`🔌 WebSocket disconnected (code: ${event.code}, reason: ${event.reason})`);
+        clearTimeout(connectionTimeout);
+
+        if (!this.isReady) {
+          // Connection closed before ready - this is an error
+          let errorMsg = 'Connection closed by server';
+
+          if (event.code === 1000) {
+            errorMsg = 'Connection closed normally';
+          } else if (event.code === 1006) {
+            errorMsg = 'Connection failed - server unreachable or rejected connection';
+          } else if (event.code === 1008) {
+            errorMsg = 'Connection rejected - invalid authentication token';
+          } else if (event.reason) {
+            errorMsg = `Connection closed: ${event.reason}`;
+          }
+
+          this.onLogMessage(errorMsg);
+          reject(new Error(errorMsg));
+        } else {
+          this.onLogMessage('WebSocket disconnected');
+        }
       };
     });
   }
