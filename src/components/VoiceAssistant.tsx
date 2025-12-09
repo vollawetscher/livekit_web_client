@@ -65,24 +65,38 @@ export default function VoiceAssistant() {
       if (!useManualJwt || !token) {
         addLog('Requesting authentication token...');
 
-        // Extract base URL and construct token endpoint
-        const url = new URL(serverUrl);
-        const baseUrl = `${url.protocol}//${url.host}`;
-        const tokenUrl = `${baseUrl.replace('wss:', 'https:').replace('ws:', 'http:')}/api/mobile/auth/token`;
+        try {
+          // Extract base URL and construct token endpoint
+          const url = new URL(serverUrl);
+          const baseUrl = `${url.protocol}//${url.host}`;
+          const tokenUrl = `${baseUrl.replace('wss:', 'https:').replace('ws:', 'http:')}/api/mobile/auth/token`;
 
-        const tokenResponse = await fetch(tokenUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: 'test-user', deviceId: 'web-test' }),
-        });
+          addLog(`Token URL: ${tokenUrl}`);
+          console.log('🔑 Fetching token from:', tokenUrl);
 
-        const data = await tokenResponse.json();
-        token = data.token;
-        addLog('Token received from server');
+          const tokenResponse = await fetch(tokenUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: 'test-user', deviceId: 'web-test' }),
+          });
 
-        // Save the token for future use
-        setJwtToken(token);
-        localStorage.setItem(STORAGE_KEYS.JWT_TOKEN, token);
+          if (!tokenResponse.ok) {
+            throw new Error(`Token fetch failed: ${tokenResponse.status} ${tokenResponse.statusText}`);
+          }
+
+          const data = await tokenResponse.json();
+          token = data.token;
+          addLog('Token received from server');
+          console.log('🔑 Token received, length:', token?.length);
+
+          // Save the token for future use
+          setJwtToken(token);
+          localStorage.setItem(STORAGE_KEYS.JWT_TOKEN, token);
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+          addLog(`Token fetch failed: ${errorMsg}`);
+          throw new Error(`Failed to get authentication token: ${errorMsg}`);
+        }
       } else {
         addLog('Using saved JWT token');
       }

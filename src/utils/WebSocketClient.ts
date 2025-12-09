@@ -22,15 +22,28 @@ export class WebSocketClient {
     this.onLogMessage = onLogMessage;
     this.onAudioReceived = onAudioReceived;
 
-    // Initialize single reusable AudioContext
-    this.audioContext = new AudioContext({ sampleRate: 8000 });
+    // Don't create AudioContext in constructor - will create it lazily on connect
+    // This avoids mobile browser restrictions on AudioContext creation
   }
 
   async connect(): Promise<void> {
     // Ensure AudioContext is initialized
     if (!this.audioContext || this.audioContext.state === 'closed') {
-      this.audioContext = new AudioContext({ sampleRate: 8000 });
-      console.log('🔊 AudioContext initialized');
+      try {
+        this.audioContext = new AudioContext({ sampleRate: 8000 });
+        console.log('🔊 AudioContext initialized, state:', this.audioContext.state);
+        this.onLogMessage(`AudioContext: ${this.audioContext.state}`);
+
+        // Try to resume if suspended (common on mobile)
+        if (this.audioContext.state === 'suspended') {
+          await this.audioContext.resume();
+          console.log('🔊 AudioContext resumed, state:', this.audioContext.state);
+        }
+      } catch (error) {
+        console.error('❌ Failed to create AudioContext:', error);
+        this.onLogMessage(`AudioContext error: ${error instanceof Error ? error.message : 'Unknown'}`);
+        throw new Error(`Failed to initialize audio: ${error instanceof Error ? error.message : 'Unknown'}`);
+      }
     }
 
     return new Promise((resolve, reject) => {
@@ -42,10 +55,15 @@ export class WebSocketClient {
       }, 10000); // 10 second timeout
 
       try {
-        this.ws = new WebSocket(`${this.url}?token=${this.token}`);
+        const wsUrl = `${this.url}?token=${this.token}`;
+        console.log('🔌 [WebSocketClient] Attempting to connect to:', wsUrl);
+        this.onLogMessage(`Connecting to ${this.url}...`);
+        this.ws = new WebSocket(wsUrl);
       } catch (error) {
         clearTimeout(connectionTimeout);
         const errorMsg = error instanceof Error ? error.message : 'Invalid WebSocket URL';
+        console.error('❌ [WebSocketClient] Failed to create WebSocket:', error);
+        this.onLogMessage(`Failed to create WebSocket: ${errorMsg}`);
         reject(new Error(`Failed to create WebSocket: ${errorMsg}`));
         return;
       }
@@ -96,10 +114,16 @@ export class WebSocketClient {
 
       this.ws.onerror = (error) => {
         console.error('❌ WebSocket error:', error);
-        this.onLogMessage('WebSocket connection error');
+        console.error('❌ WebSocket readyState:', this.ws?.readyState);
+        console.error('❌ Navigator online:', navigator.onLine);
+        console.error('❌ URL:', this.url);
+
+        const detailedError = `WebSocket error - ReadyState: ${this.ws?.readyState}, Online: ${navigator.onLine}`;
+        this.onLogMessage(detailedError);
         clearTimeout(connectionTimeout);
-        // WebSocket errors don't provide useful info, so we give a generic message
-        reject(new Error('Connection failed - check server URL and network connection'));
+
+        // Provide more specific error message
+        reject(new Error('Connection failed - WebSocket error (check console for details)'));
       };
 
       this.ws.onclose = (event) => {

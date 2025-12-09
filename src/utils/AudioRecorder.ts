@@ -15,16 +15,30 @@ export class AudioRecorder {
   async start(): Promise<void> {
     console.log('🎤 [AudioRecorder] Requesting microphone access...');
 
-    this.mediaStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        sampleRate: 16000,
-        channelCount: 1,
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-        latency: 0,
-      },
-    });
+    try {
+      this.mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          sampleRate: 16000,
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          latency: 0,
+        },
+      });
+    } catch (error) {
+      console.error('❌ [AudioRecorder] Failed to get microphone access:', error);
+      if (error instanceof Error) {
+        if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+          throw new Error('Microphone access denied. Please allow microphone permissions in your browser settings.');
+        } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+          throw new Error('No microphone found. Please connect a microphone and try again.');
+        } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+          throw new Error('Microphone is already in use by another application.');
+        }
+      }
+      throw new Error(`Failed to access microphone: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
 
     const audioTrack = this.mediaStream.getAudioTracks()[0];
     const settings = audioTrack.getSettings();
