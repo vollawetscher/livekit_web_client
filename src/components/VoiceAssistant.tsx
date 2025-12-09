@@ -65,14 +65,16 @@ export default function VoiceAssistant() {
       if (!useManualJwt || !token) {
         addLog('Requesting authentication token...');
 
-        const tokenResponse = await fetch(
-          serverUrl.replace('/mobile-stream', '/api/mobile/auth/token'),
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: 'test-user', deviceId: 'web-test' }),
-          }
-        );
+        // Extract base URL and construct token endpoint
+        const url = new URL(serverUrl);
+        const baseUrl = `${url.protocol}//${url.host}`;
+        const tokenUrl = `${baseUrl.replace('wss:', 'https:').replace('ws:', 'http:')}/api/mobile/auth/token`;
+
+        const tokenResponse = await fetch(tokenUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: 'test-user', deviceId: 'web-test' }),
+        });
 
         const data = await tokenResponse.json();
         token = data.token;
