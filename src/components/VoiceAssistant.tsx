@@ -27,17 +27,27 @@ export default function VoiceAssistant() {
 
   // Load saved values on mount
   useEffect(() => {
+    const envUrl = import.meta.env.VITE_SERVER_URL;
+    const envToken = import.meta.env.VITE_JWT_TOKEN;
     const savedUrl = localStorage.getItem(STORAGE_KEYS.SERVER_URL);
     const savedToken = localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
 
     if (savedUrl) {
       setServerUrl(savedUrl);
       addLog('Loaded saved server URL');
+    } else if (envUrl) {
+      setServerUrl(envUrl);
+      addLog('Loaded server URL from environment');
     }
+
     if (savedToken) {
       setJwtToken(savedToken);
       setUseManualJwt(true);
       addLog('Loaded saved JWT token');
+    } else if (envToken) {
+      setJwtToken(envToken);
+      setUseManualJwt(true);
+      addLog('Loaded JWT token from environment');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
