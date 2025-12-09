@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, Wifi, WifiOff, Trash2 } from 'lucide-react';
+import { Mic, MicOff, Wifi, WifiOff, Trash2, Bug } from 'lucide-react';
 import { AudioRecorder } from '../utils/AudioRecorder';
 import { WebSocketClient } from '../utils/WebSocketClient';
 
@@ -155,6 +155,22 @@ export default function VoiceAssistant() {
     addLog('Cleared saved data');
   };
 
+  const handleDebugStatus = () => {
+    console.log('🔍 ===== DEBUG STATUS DUMP =====');
+    if (wsClientRef.current) {
+      wsClientRef.current.logStatus();
+    } else {
+      console.log('❌ WebSocketClient: Not initialized');
+    }
+    if (recorderRef.current) {
+      console.log('✅ AudioRecorder: Initialized');
+    } else {
+      console.log('❌ AudioRecorder: Not initialized');
+    }
+    console.log('🔍 ===========================');
+    addLog('Debug status logged to console');
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 text-white">
       <div className="container mx-auto px-4 py-8 max-w-2xl">
@@ -274,24 +290,36 @@ export default function VoiceAssistant() {
           )}
         </div>
 
-        <div className="flex gap-3 mb-8">
-          <button
-            onClick={handleStart}
-            disabled={isConnected}
-            className="flex-1 py-4 rounded-lg font-semibold text-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-green-600 hover:bg-green-700 active:scale-95 shadow-lg"
-          >
-            <Mic className="w-6 h-6" />
-            Start Call
-          </button>
+        <div className="space-y-3 mb-8">
+          <div className="flex gap-3">
+            <button
+              onClick={handleStart}
+              disabled={isConnected}
+              className="flex-1 py-4 rounded-lg font-semibold text-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-green-600 hover:bg-green-700 active:scale-95 shadow-lg"
+            >
+              <Mic className="w-6 h-6" />
+              Start Call
+            </button>
 
-          <button
-            onClick={handleStop}
-            disabled={!isConnected}
-            className="flex-1 py-4 rounded-lg font-semibold text-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-red-600 hover:bg-red-700 active:scale-95 shadow-lg"
-          >
-            <MicOff className="w-6 h-6" />
-            Stop Call
-          </button>
+            <button
+              onClick={handleStop}
+              disabled={!isConnected}
+              className="flex-1 py-4 rounded-lg font-semibold text-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-red-600 hover:bg-red-700 active:scale-95 shadow-lg"
+            >
+              <MicOff className="w-6 h-6" />
+              Stop Call
+            </button>
+          </div>
+
+          {isConnected && (
+            <button
+              onClick={handleDebugStatus}
+              className="w-full py-2 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-all bg-slate-700 hover:bg-slate-600"
+            >
+              <Bug className="w-4 h-4" />
+              Log Debug Status
+            </button>
+          )}
         </div>
 
         <div className="bg-slate-800/50 rounded-lg border border-slate-700">

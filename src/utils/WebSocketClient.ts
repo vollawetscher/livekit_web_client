@@ -12,6 +12,10 @@ export class WebSocketClient {
   private isPlaying = false;
   private currentSource: AudioBufferSourceNode | null = null;
 
+  // Debugging
+  private audioSentCount = 0;
+  private lastSendLogTime = 0;
+
   constructor(url: string, token: string, onLogMessage: (msg: string) => void, onAudioReceived?: () => void) {
     this.url = url;
     this.token = token;
@@ -48,16 +52,21 @@ export class WebSocketClient {
       this.ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
 
+        console.log(`📨 [WebSocketClient] Received event: ${data.event}`);
+
         if (data.event === 'ready') {
           console.log('🟢 Server ready');
           this.onLogMessage('Server ready - can send audio now');
           this.isReady = true;
           resolve();
         } else if (data.event === 'audio') {
+          console.log(`🔊 [WebSocketClient] Received audio chunk (${data.audio?.length} bytes)`);
           this.playAudio(data.audio);
         } else if (data.event === 'transcript') {
           console.log('📝 Transcript:', data.text);
           this.onLogMessage('Transcript: ' + data.text);
+        } else {
+          console.log(`⚠️ [WebSocketClient] Unknown event: ${data.event}`, data);
         }
       };
 
@@ -81,12 +90,38 @@ export class WebSocketClient {
   }
 
   sendAudio(audioData: ArrayBuffer): void {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN && this.isReady) {
+    this.audioSentCount++;
+
+    // Log every 5 seconds
+    const now = Date.now();
+    if (now - this.lastSendLogTime > 5000) {
+      console.log(`📤 [WebSocketClient] Sending audio - count: ${this.audioSentCount}, ws ready: ${this.ws?.readyState === WebSocket.OPEN}, server ready: ${this.isReady}`);
+      this.lastSendLogTime = now;
+    }
+
+    if (!this.ws) {
+      console.error('❌ [WebSocketClient] Cannot send audio - WebSocket is null');
+      return;
+    }
+
+    if (this.ws.readyState !== WebSocket.OPEN) {
+      console.error(`❌ [WebSocketClient] Cannot send audio - WebSocket state: ${this.ws.readyState} (expected ${WebSocket.OPEN})`);
+      return;
+    }
+
+    if (!this.isReady) {
+      console.warn('⚠️ [WebSocketClient] Cannot send audio - server not ready yet');
+      return;
+    }
+
+    try {
       const base64 = btoa(String.fromCharCode(...new Uint8Array(audioData)));
       this.send({
         event: 'media',
         audio: base64,
       });
+    } catch (error) {
+      console.error('❌ [WebSocketClient] Error encoding/sending audio:', error);
     }
   }
 
@@ -181,6 +216,16 @@ export class WebSocketClient {
     let sample = (mantissa << 3) + 0x84;
     sample <<= exponent;
     return sign ? -sample : sample;
+  }
+
+  getStatus(): string {
+    const wsState = this.ws ? ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][this.ws.readyState] : 'NULL';
+    const contextState = this.audioContext?.state || 'NULL';
+    return `WebSocket: ${wsState}, Server Ready: ${this.isReady}, AudioContext: ${contextState}, Queue: ${this.audioQueue.length}, Playing: ${this.isPlaying}, Sent: ${this.audioSentCount}`;
+  }
+
+  logStatus(): void {
+    console.log(`📊 [WebSocketClient] Status: ${this.getStatus()}`);
   }
 
   disconnect(): void {
