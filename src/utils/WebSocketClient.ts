@@ -3,11 +3,13 @@ export class WebSocketClient {
   private token: string;
   private ws: WebSocket | null = null;
   private onLogMessage: (msg: string) => void;
+  private onAudioReceived?: () => void;
 
-  constructor(url: string, token: string, onLogMessage: (msg: string) => void) {
+  constructor(url: string, token: string, onLogMessage: (msg: string) => void, onAudioReceived?: () => void) {
     this.url = url;
     this.token = token;
     this.onLogMessage = onLogMessage;
+    this.onAudioReceived = onAudioReceived;
   }
 
   async connect(): Promise<void> {
@@ -69,6 +71,10 @@ export class WebSocketClient {
   }
 
   playAudio(base64Audio: string): void {
+    if (this.onAudioReceived) {
+      this.onAudioReceived();
+    }
+
     const binaryString = atob(base64Audio);
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {

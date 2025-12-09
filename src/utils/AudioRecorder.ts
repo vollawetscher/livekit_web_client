@@ -1,11 +1,13 @@
 export class AudioRecorder {
   private onAudioData: (data: ArrayBuffer) => void;
+  private onAudioLevel?: (level: number) => void;
   private audioContext: AudioContext | null = null;
   private mediaStream: MediaStream | null = null;
   private processor: ScriptProcessorNode | null = null;
 
-  constructor(onAudioData: (data: ArrayBuffer) => void) {
+  constructor(onAudioData: (data: ArrayBuffer) => void, onAudioLevel?: (level: number) => void) {
     this.onAudioData = onAudioData;
+    this.onAudioLevel = onAudioLevel;
   }
 
   async start(): Promise<void> {
@@ -25,6 +27,18 @@ export class AudioRecorder {
 
     this.processor.onaudioprocess = (e) => {
       const inputData = e.inputBuffer.getChannelData(0);
+
+      // Calculate audio level (RMS)
+      let sum = 0;
+      for (let i = 0; i < inputData.length; i++) {
+        sum += inputData[i] * inputData[i];
+      }
+      const rms = Math.sqrt(sum / inputData.length);
+      const level = Math.min(1, rms * 10); // Amplify for visibility
+
+      if (this.onAudioLevel) {
+        this.onAudioLevel(level);
+      }
 
       const pcm16 = new Int16Array(inputData.length);
       for (let i = 0; i < inputData.length; i++) {

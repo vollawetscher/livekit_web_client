@@ -14,8 +14,11 @@ export default function VoiceAssistant() {
   const [jwtToken, setJwtToken] = useState('');
   const [useManualJwt, setUseManualJwt] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
+  const [inputLevel, setInputLevel] = useState(0);
+  const [isReceivingAudio, setIsReceivingAudio] = useState(false);
   const recorderRef = useRef<AudioRecorder | null>(null);
   const wsClientRef = useRef<WebSocketClient | null>(null);
+  const audioTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const addLog = (message: string) => {
     const timestamp = new Date().toLocaleTimeString();
@@ -76,14 +79,28 @@ export default function VoiceAssistant() {
       localStorage.setItem(STORAGE_KEYS.SERVER_URL, serverUrl);
 
       addLog('Connecting to WebSocket...');
-      wsClientRef.current = new WebSocketClient(serverUrl, token, addLog);
+      wsClientRef.current = new WebSocketClient(
+        serverUrl,
+        token,
+        addLog,
+        () => {
+          setIsReceivingAudio(true);
+          if (audioTimeoutRef.current) clearTimeout(audioTimeoutRef.current);
+          audioTimeoutRef.current = setTimeout(() => setIsReceivingAudio(false), 200);
+        }
+      );
       await wsClientRef.current.connect();
 
       addLog('Starting audio recording...');
 
-      recorderRef.current = new AudioRecorder((audioData) => {
-        wsClientRef.current?.sendAudio(audioData);
-      });
+      recorderRef.current = new AudioRecorder(
+        (audioData) => {
+          wsClientRef.current?.sendAudio(audioData);
+        },
+        (level) => {
+          setInputLevel(level);
+        }
+      );
 
       await recorderRef.current.start();
 
@@ -108,7 +125,14 @@ export default function VoiceAssistant() {
       wsClientRef.current = null;
     }
 
+    if (audioTimeoutRef.current) {
+      clearTimeout(audioTimeoutRef.current);
+      audioTimeoutRef.current = null;
+    }
+
     setIsConnected(false);
+    setInputLevel(0);
+    setIsReceivingAudio(false);
     addLog('Disconnected');
   };
 
@@ -151,6 +175,39 @@ export default function VoiceAssistant() {
             </>
           )}
         </div>
+
+        {isConnected && (
+          <div className="mb-6 space-y-3">
+            <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-4">
+              <div className="flex items-center gap-3 mb-2">
+                <Mic className="w-4 h-4 text-blue-400" />
+                <span className="text-sm font-medium text-slate-300">Microphone Input</span>
+              </div>
+              <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-75"
+                  style={{ width: `${inputLevel * 100}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-4">
+              <div className="flex items-center gap-3 mb-2">
+                <div className={`w-4 h-4 rounded-full transition-colors ${isReceivingAudio ? 'bg-green-400' : 'bg-slate-600'}`} />
+                <span className="text-sm font-medium text-slate-300">Assistant Speaking</span>
+              </div>
+              <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-200 ${
+                    isReceivingAudio
+                      ? 'bg-gradient-to-r from-green-500 to-green-400 w-full'
+                      : 'bg-slate-600 w-0'
+                  }`}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="mb-6 space-y-4">
           <div>
