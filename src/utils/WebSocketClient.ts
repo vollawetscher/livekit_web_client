@@ -6,14 +6,29 @@ export class WebSocketClient {
   private onAudioReceived?: () => void;
   private isReady = false;
 
+  // Audio playback queue system
+  private audioContext: AudioContext | null = null;
+  private audioQueue: AudioBuffer[] = [];
+  private isPlaying = false;
+  private currentSource: AudioBufferSourceNode | null = null;
+
   constructor(url: string, token: string, onLogMessage: (msg: string) => void, onAudioReceived?: () => void) {
     this.url = url;
     this.token = token;
     this.onLogMessage = onLogMessage;
     this.onAudioReceived = onAudioReceived;
+
+    // Initialize single reusable AudioContext
+    this.audioContext = new AudioContext({ sampleRate: 8000 });
   }
 
   async connect(): Promise<void> {
+    // Ensure AudioContext is initialized
+    if (!this.audioContext || this.audioContext.state === 'closed') {
+      this.audioContext = new AudioContext({ sampleRate: 8000 });
+      console.log('🔊 AudioContext initialized');
+    }
+
     return new Promise((resolve, reject) => {
       this.ws = new WebSocket(`${this.url}?token=${this.token}`);
 
@@ -80,24 +95,82 @@ export class WebSocketClient {
       this.onAudioReceived();
     }
 
+    if (!this.audioContext) {
+      console.error('AudioContext not initialized');
+      return;
+    }
+
+    // Decode base64 to bytes
     const binaryString = atob(base64Audio);
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
       bytes[i] = binaryString.charCodeAt(i);
     }
 
-    const audioContext = new AudioContext({ sampleRate: 8000 });
-    const audioBuffer = audioContext.createBuffer(1, bytes.length / 2, 8000);
+    // Create audio buffer from mulaw-encoded bytes
+    const audioBuffer = this.audioContext.createBuffer(1, bytes.length / 2, 8000);
     const channelData = audioBuffer.getChannelData(0);
 
     for (let i = 0; i < bytes.length; i++) {
       channelData[i] = this.mulawToLinear(bytes[i]) / 32768.0;
     }
 
-    const source = audioContext.createBufferSource();
+    // Add to queue and start playback if not already playing
+    this.audioQueue.push(audioBuffer);
+    console.log(`🎵 Audio chunk queued (queue size: ${this.audioQueue.length})`);
+
+    if (!this.isPlaying) {
+      this.playNextInQueue();
+    }
+  }
+
+  private playNextInQueue(): void {
+    if (this.audioQueue.length === 0) {
+      this.isPlaying = false;
+      console.log('✅ Audio queue empty - playback complete');
+      return;
+    }
+
+    if (!this.audioContext) {
+      console.error('AudioContext not initialized');
+      return;
+    }
+
+    this.isPlaying = true;
+    const audioBuffer = this.audioQueue.shift()!;
+
+    console.log(`▶️ Playing audio chunk (${this.audioQueue.length} remaining in queue)`);
+
+    // Create and configure audio source
+    const source = this.audioContext.createBufferSource();
     source.buffer = audioBuffer;
-    source.connect(audioContext.destination);
+    source.connect(this.audioContext.destination);
+
+    // Play next chunk when this one finishes
+    source.onended = () => {
+      this.currentSource = null;
+      this.playNextInQueue();
+    };
+
+    this.currentSource = source;
     source.start();
+  }
+
+  clearAudioQueue(): void {
+    // Stop current playback
+    if (this.currentSource) {
+      try {
+        this.currentSource.stop();
+      } catch (e) {
+        // Ignore if already stopped
+      }
+      this.currentSource = null;
+    }
+
+    // Clear queue
+    this.audioQueue = [];
+    this.isPlaying = false;
+    console.log('🧹 Audio queue cleared');
   }
 
   private mulawToLinear(mulaw: number): number {
@@ -111,10 +184,21 @@ export class WebSocketClient {
   }
 
   disconnect(): void {
+    // Clear audio queue and stop playback
+    this.clearAudioQueue();
+
+    // Close AudioContext
+    if (this.audioContext) {
+      this.audioContext.close();
+      this.audioContext = null;
+    }
+
+    // Close WebSocket
     if (this.ws) {
       this.ws.close();
       this.ws = null;
     }
+
     this.isReady = false;
   }
 }

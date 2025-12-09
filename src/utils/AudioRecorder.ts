@@ -52,7 +52,7 @@ export class AudioRecorder {
     };
 
     source.connect(this.processor);
-    this.processor.connect(this.audioContext.destination);
+    // Note: NOT connecting processor to destination to prevent echo cancellation conflicts
 
     console.log('🎤 Audio recording started');
   }
