@@ -80,10 +80,9 @@ export class WebSocketClient {
         this.onLogMessage('WebSocket connected');
         this.onLogMessage(`WS State: ${this.ws?.readyState}, Protocol: ${this.ws?.protocol || 'none'}`);
 
-        this.sessionId = 'session-' + Date.now();
         const startMessage = {
           event: 'start',
-          callId: this.sessionId,
+          callId: 'web-client-' + Date.now(),
           metadata: {},
         };
         console.log('📤 [WebSocketClient] Sending start event:', startMessage);
@@ -102,6 +101,16 @@ export class WebSocketClient {
 
           if (data.event === 'ready') {
             console.log('🟢 Server ready');
+
+            // CRITICAL: Save the sessionId from the server's ready event
+            if (data.sessionId) {
+              this.sessionId = data.sessionId;
+              console.log('✅ Session ID received from server:', this.sessionId);
+              this.onLogMessage(`Session ready: ${this.sessionId}`);
+            } else {
+              console.warn('⚠️ No sessionId in ready event');
+            }
+
             this.onLogMessage('Server ready - can send audio now');
             this.isReady = true;
             clearTimeout(connectionTimeout);
