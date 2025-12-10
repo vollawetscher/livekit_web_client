@@ -23,7 +23,6 @@ export class AudioRecorder {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
-          latency: 0,
         },
       });
     } catch (error) {

@@ -5,10 +5,10 @@ export class WebSocketClient {
   private onLogMessage: (msg: string) => void;
   private onAudioReceived?: () => void;
   private isReady = false;
+  private sessionId: string = '';
 
   // Audio playback queue system with precise timing
   private audioContext: AudioContext | null = null;
-  private audioQueue: AudioBuffer[] = [];
   private nextPlayTime = 0;
   private scheduledSources: AudioBufferSourceNode[] = [];
 
@@ -80,9 +80,10 @@ export class WebSocketClient {
         this.onLogMessage('WebSocket connected');
         this.onLogMessage(`WS State: ${this.ws?.readyState}, Protocol: ${this.ws?.protocol || 'none'}`);
 
+        this.sessionId = 'session-' + Date.now();
         const startMessage = {
           event: 'start',
-          callId: 'test-' + Date.now(),
+          callId: this.sessionId,
           metadata: {},
         };
         console.log('📤 [WebSocketClient] Sending start event:', startMessage);
@@ -277,7 +278,6 @@ export class WebSocketClient {
 
     // Clear state
     this.scheduledSources = [];
-    this.audioQueue = [];
     this.nextPlayTime = 0;
     console.log('🧹 Audio queue cleared');
   }
@@ -321,5 +321,10 @@ export class WebSocketClient {
     }
 
     this.isReady = false;
+    this.sessionId = '';
+  }
+
+  getSessionId(): string {
+    return this.sessionId;
   }
 }

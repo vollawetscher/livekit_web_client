@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { Mic, MicOff, Wifi, WifiOff, Trash2, Bug } from 'lucide-react';
 import { AudioRecorder } from '../utils/AudioRecorder';
 import { WebSocketClient } from '../utils/WebSocketClient';
+import { DialService } from '../utils/DialService';
+import Dialpad from './Dialpad';
 
 const STORAGE_KEYS = {
   SERVER_URL: 'voice_assistant_server_url',
@@ -16,6 +18,8 @@ export default function VoiceAssistant() {
   const [logs, setLogs] = useState<string[]>([]);
   const [inputLevel, setInputLevel] = useState(0);
   const [isReceivingAudio, setIsReceivingAudio] = useState(false);
+  const [isDialing, setIsDialing] = useState(false);
+  const [callStatus, setCallStatus] = useState<string | null>(null);
   const recorderRef = useRef<AudioRecorder | null>(null);
   const wsClientRef = useRef<WebSocketClient | null>(null);
   const audioTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -187,6 +191,48 @@ export default function VoiceAssistant() {
     addLog('Debug status logged to console');
   };
 
+  const handleDial = async (phoneNumber: string, contactName: string) => {
+    if (!wsClientRef.current || !jwtToken || !serverUrl) {
+      alert('Connection not ready. Please start the call first.');
+      return;
+    }
+
+    try {
+      setIsDialing(true);
+      setCallStatus('Initiating call...');
+      addLog(`Dialing ${contactName} at ${phoneNumber}...`);
+
+      const sessionId = wsClientRef.current.getSessionId();
+
+      // Extract base URL from WebSocket URL
+      const url = new URL(serverUrl);
+      const baseUrl = `${url.protocol}//${url.host}`.replace('wss:', 'https:').replace('ws:', 'http:');
+
+      const dialService = new DialService(baseUrl, jwtToken);
+      const result = await dialService.dialContact(phoneNumber, contactName, sessionId);
+
+      setCallStatus(`Call ${result.status} - ${result.message}`);
+      addLog(`Call initiated: ${result.callId}`);
+      addLog(`Twilio SID: ${result.twilioCallSid}`);
+
+      // Clear status after 5 seconds
+      setTimeout(() => {
+        setCallStatus(null);
+      }, 5000);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setCallStatus(`Call failed: ${errorMessage}`);
+      addLog(`Dial error: ${errorMessage}`);
+
+      // Clear error status after 5 seconds
+      setTimeout(() => {
+        setCallStatus(null);
+      }, 5000);
+    } finally {
+      setIsDialing(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 text-white">
       <div className="container mx-auto px-4 py-8 max-w-2xl">
@@ -337,6 +383,16 @@ export default function VoiceAssistant() {
             </button>
           )}
         </div>
+
+        {isConnected && (
+          <div className="mb-8">
+            <Dialpad
+              onDial={handleDial}
+              isDialing={isDialing}
+              callStatus={callStatus}
+            />
+          </div>
+        )}
 
         <div className="bg-slate-800/50 rounded-lg border border-slate-700">
           <div className="px-4 py-3 border-b border-slate-700">
