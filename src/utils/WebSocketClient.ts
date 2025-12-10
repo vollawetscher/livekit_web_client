@@ -55,7 +55,7 @@ export class WebSocketClient {
       }, 10000); // 10 second timeout
 
       try {
-        const wsUrl = `${this.url}?token=${this.token}`;
+        const wsUrl = `${this.url}?token=${encodeURIComponent(this.token)}`;
         console.log('🔌 [WebSocketClient] Attempting to connect to:', wsUrl);
         this.onLogMessage(`Connecting to ${this.url}...`);
         this.ws = new WebSocket(wsUrl);
