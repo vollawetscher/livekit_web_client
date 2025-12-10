@@ -123,7 +123,7 @@ export class WebSocketClient {
         clearTimeout(connectionTimeout);
 
         // Provide more specific error message
-        reject(new Error('Connection failed - WebSocket error (check console for details)'));
+        reject(new Error(`Connection failed - ${detailedError}`));
       };
 
       this.ws.onclose = (event) => {
