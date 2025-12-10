@@ -57,8 +57,12 @@ export class WebSocketClient {
       try {
         const wsUrl = `${this.url}?token=${encodeURIComponent(this.token)}`;
         console.log('🔌 [WebSocketClient] Attempting to connect to:', wsUrl);
+        console.log('🔌 [WebSocketClient] User Agent:', navigator.userAgent);
+        console.log('🔌 [WebSocketClient] Online status:', navigator.onLine);
         this.onLogMessage(`Connecting to ${this.url}...`);
+        this.onLogMessage(`Platform: ${navigator.platform || 'Unknown'}`);
         this.ws = new WebSocket(wsUrl);
+        console.log('🔌 [WebSocketClient] WebSocket created, initial state:', this.ws.readyState);
       } catch (error) {
         clearTimeout(connectionTimeout);
         const errorMsg = error instanceof Error ? error.message : 'Invalid WebSocket URL';
@@ -70,22 +74,30 @@ export class WebSocketClient {
 
       this.ws.onopen = () => {
         console.log('✅ WebSocket connected');
+        console.log('✅ [WebSocketClient] ReadyState:', this.ws?.readyState);
+        console.log('✅ [WebSocketClient] Protocol:', this.ws?.protocol);
+        console.log('✅ [WebSocketClient] Extensions:', this.ws?.extensions);
         this.onLogMessage('WebSocket connected');
+        this.onLogMessage(`WS State: ${this.ws?.readyState}, Protocol: ${this.ws?.protocol || 'none'}`);
 
-        this.send({
+        const startMessage = {
           event: 'start',
           callId: 'test-' + Date.now(),
           metadata: {},
-        });
+        };
+        console.log('📤 [WebSocketClient] Sending start event:', startMessage);
+        this.send(startMessage);
 
-        this.onLogMessage('Waiting for server ready...');
+        this.onLogMessage('Sent start event, waiting for server ready...');
       };
 
       this.ws.onmessage = (event) => {
         try {
+          console.log(`📨 [WebSocketClient] Raw message received:`, event.data);
           const data = JSON.parse(event.data);
 
-          console.log(`📨 [WebSocketClient] Received event: ${data.event}`);
+          console.log(`📨 [WebSocketClient] Parsed event: ${data.event}`, data);
+          this.onLogMessage(`Received: ${data.event}`);
 
           if (data.event === 'ready') {
             console.log('🟢 Server ready');
