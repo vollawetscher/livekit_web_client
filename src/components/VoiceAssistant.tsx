@@ -20,6 +20,8 @@ export default function VoiceAssistant() {
   const [isReceivingAudio, setIsReceivingAudio] = useState(false);
   const [isDialing, setIsDialing] = useState(false);
   const [callStatus, setCallStatus] = useState<string | null>(null);
+  const [isCalibrating, setIsCalibrating] = useState(false);
+  const [noiseThreshold, setNoiseThreshold] = useState<number | null>(null);
   const recorderRef = useRef<AudioRecorder | null>(null);
   const wsClientRef = useRef<WebSocketClient | null>(null);
   const audioTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -122,6 +124,8 @@ export default function VoiceAssistant() {
       await wsClientRef.current.connect();
 
       addLog('Starting audio recording...');
+      setIsCalibrating(true);
+      addLog('Calibrating microphone - please remain quiet for 2 seconds...');
 
       recorderRef.current = new AudioRecorder(
         (audioData) => {
@@ -129,13 +133,19 @@ export default function VoiceAssistant() {
         },
         (level) => {
           setInputLevel(level);
+        },
+        (threshold) => {
+          // Calibration complete callback
+          setIsCalibrating(false);
+          setNoiseThreshold(threshold);
+          addLog(`Calibration complete! Noise threshold: ${threshold.toFixed(4)}`);
+          addLog('Voice assistant ready - speak normally now');
         }
       );
 
       await recorderRef.current.start();
 
       setIsConnected(true);
-      addLog('Voice assistant ready!');
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
@@ -163,6 +173,8 @@ export default function VoiceAssistant() {
     setIsConnected(false);
     setInputLevel(0);
     setIsReceivingAudio(false);
+    setIsCalibrating(false);
+    setNoiseThreshold(null);
     addLog('Disconnected');
   };
 
@@ -266,6 +278,26 @@ export default function VoiceAssistant() {
 
         {isConnected && (
           <div className="mb-6 space-y-3">
+            {isCalibrating && (
+              <div className="bg-yellow-900/30 border border-yellow-500/50 rounded-lg p-4 animate-pulse">
+                <div className="flex items-center gap-3">
+                  <div className="w-4 h-4 rounded-full bg-yellow-400 animate-ping" />
+                  <div>
+                    <p className="text-yellow-300 font-medium text-sm">Calibrating Microphone...</p>
+                    <p className="text-yellow-200/70 text-xs mt-1">Please remain quiet for 2 seconds</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {!isCalibrating && noiseThreshold !== null && (
+              <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-3">
+                <p className="text-blue-300 text-xs">
+                  Voice detection active - Only audio above noise threshold is transmitted
+                </p>
+              </div>
+            )}
+
             <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-4">
               <div className="flex items-center gap-3 mb-2">
                 <Mic className="w-4 h-4 text-blue-400" />
