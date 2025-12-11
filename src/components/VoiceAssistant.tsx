@@ -67,21 +67,16 @@ export default function VoiceAssistant() {
         addLog(`Token valid until: ${expiry.toLocaleDateString()}`);
       }
 
-      addLog('Connecting to WebSocket...');
-      wsClientRef.current = new WebSocketClient(
-        serverUrl,
-        token,
-        addLog,
-        () => {
-          setIsReceivingAudio(true);
-          if (audioTimeoutRef.current) clearTimeout(audioTimeoutRef.current);
-          audioTimeoutRef.current = setTimeout(() => setIsReceivingAudio(false), 200);
-        }
-      );
-      await wsClientRef.current.connect();
-
+      // Start audio recording and calibration FIRST
       addLog('Starting audio recording...');
-      addLog('Waiting for AI greeting to finish before calibration...');
+      setIsCalibrating(true);
+      addLog('Calibrating microphone - please remain quiet for 2 seconds...');
+
+      // Create a promise that resolves when calibration is complete
+      let calibrationResolve: () => void;
+      const calibrationPromise = new Promise<void>((resolve) => {
+        calibrationResolve = resolve;
+      });
 
       recorderRef.current = new AudioRecorder(
         (audioData) => {
@@ -95,17 +90,30 @@ export default function VoiceAssistant() {
           setIsCalibrating(false);
           setNoiseThreshold(threshold);
           addLog(`Calibration complete! Noise threshold: ${threshold.toFixed(4)}`);
-          addLog('Voice assistant ready - speak normally now');
-        },
-        () => {
-          // Calibration start callback
-          setIsCalibrating(true);
-          addLog('Calibrating microphone - please remain quiet for 2 seconds...');
+          calibrationResolve();
         }
       );
 
       await recorderRef.current.start();
 
+      // Wait for calibration to complete
+      await calibrationPromise;
+      addLog('Connecting to voice assistant...');
+
+      // Now connect to WebSocket AFTER calibration
+      wsClientRef.current = new WebSocketClient(
+        serverUrl,
+        token,
+        addLog,
+        () => {
+          setIsReceivingAudio(true);
+          if (audioTimeoutRef.current) clearTimeout(audioTimeoutRef.current);
+          audioTimeoutRef.current = setTimeout(() => setIsReceivingAudio(false), 200);
+        }
+      );
+      await wsClientRef.current.connect();
+
+      addLog('Voice assistant ready - speak normally now');
       setIsConnected(true);
     } catch (error) {
       const errorMessage =
