@@ -14,7 +14,7 @@ export class AudioRecorder {
   private calibrationStartTime = 0;
   private calibrationDuration = 2000; // 2 seconds
   private noiseThreshold = 0;
-  private thresholdMultiplier = 3; // Threshold is 3x the background noise
+  private thresholdMultiplier = 1.5; // Threshold is 1.5x the background noise
 
   constructor(
     onAudioData: (data: ArrayBuffer) => void,
