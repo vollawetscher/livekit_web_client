@@ -1,6 +1,7 @@
 export class AudioRecorder {
   private onAudioData: (data: ArrayBuffer) => void;
   private onAudioLevel?: (level: number) => void;
+  private onCalibrationStart?: () => void;
   private onCalibrationComplete?: (threshold: number) => void;
   private audioContext: AudioContext | null = null;
   private mediaStream: MediaStream | null = null;
@@ -9,21 +10,25 @@ export class AudioRecorder {
   private lastLogTime = 0;
 
   // Voice Activity Detection (VAD) properties
-  private isCalibrating = true;
+  private isCalibrating = false; // Start as false, will be enabled after delay
   private calibrationSamples: number[] = [];
   private calibrationStartTime = 0;
+  private calibrationDelay = 3000; // Wait 3 seconds before starting calibration
   private calibrationDuration = 2000; // 2 seconds
   private noiseThreshold = 0;
   private thresholdMultiplier = 1.5; // Threshold is 1.5x the background noise
+  private audioStartTime = 0;
 
   constructor(
     onAudioData: (data: ArrayBuffer) => void,
     onAudioLevel?: (level: number) => void,
-    onCalibrationComplete?: (threshold: number) => void
+    onCalibrationComplete?: (threshold: number) => void,
+    onCalibrationStart?: () => void
   ) {
     this.onAudioData = onAudioData;
     this.onAudioLevel = onAudioLevel;
     this.onCalibrationComplete = onCalibrationComplete;
+    this.onCalibrationStart = onCalibrationStart;
   }
 
   async start(): Promise<void> {
@@ -77,11 +82,10 @@ export class AudioRecorder {
       console.log(`🎤 [AudioRecorder] AudioContext state changed to: ${this.audioContext?.state}`);
     });
 
-    // Start calibration phase
-    this.isCalibrating = true;
-    this.calibrationSamples = [];
-    this.calibrationStartTime = Date.now();
-    console.log('🎯 [AudioRecorder] Starting noise calibration (please remain quiet for 2 seconds)...');
+    // Track audio start time
+    this.audioStartTime = Date.now();
+    this.isCalibrating = false;
+    console.log(`⏳ [AudioRecorder] Waiting ${this.calibrationDelay / 1000} seconds before starting calibration (letting AI finish greeting)...`);
 
     const source = this.audioContext.createMediaStreamSource(this.mediaStream);
 
@@ -99,7 +103,31 @@ export class AudioRecorder {
       const rms = Math.sqrt(sum / inputData.length);
       const level = Math.min(1, rms * 10); // Amplify for visibility
 
-      // Handle calibration phase
+      const timeSinceStart = Date.now() - this.audioStartTime;
+
+      // Phase 1: Pre-calibration delay (waiting for AI greeting to finish)
+      if (!this.isCalibrating && timeSinceStart < this.calibrationDelay) {
+        // Just show audio level, don't calibrate or send audio
+        if (this.onAudioLevel) {
+          this.onAudioLevel(level);
+        }
+        return;
+      }
+
+      // Phase 2: Start calibration if delay has passed
+      if (!this.isCalibrating && timeSinceStart >= this.calibrationDelay) {
+        this.isCalibrating = true;
+        this.calibrationSamples = [];
+        this.calibrationStartTime = Date.now();
+        console.log('🎯 [AudioRecorder] Starting noise calibration (please remain quiet for 2 seconds)...');
+
+        // Notify UI that calibration has started
+        if (this.onCalibrationStart) {
+          this.onCalibrationStart();
+        }
+      }
+
+      // Phase 3: Handle calibration phase
       if (this.isCalibrating) {
         const elapsed = Date.now() - this.calibrationStartTime;
 

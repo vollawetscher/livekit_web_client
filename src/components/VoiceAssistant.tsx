@@ -81,8 +81,7 @@ export default function VoiceAssistant() {
       await wsClientRef.current.connect();
 
       addLog('Starting audio recording...');
-      setIsCalibrating(true);
-      addLog('Calibrating microphone - please remain quiet for 2 seconds...');
+      addLog('Waiting for AI greeting to finish before calibration...');
 
       recorderRef.current = new AudioRecorder(
         (audioData) => {
@@ -97,6 +96,11 @@ export default function VoiceAssistant() {
           setNoiseThreshold(threshold);
           addLog(`Calibration complete! Noise threshold: ${threshold.toFixed(4)}`);
           addLog('Voice assistant ready - speak normally now');
+        },
+        () => {
+          // Calibration start callback
+          setIsCalibrating(true);
+          addLog('Calibrating microphone - please remain quiet for 2 seconds...');
         }
       );
 
