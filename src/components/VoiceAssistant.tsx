@@ -18,6 +18,7 @@ export default function VoiceAssistant() {
   const [callStatus, setCallStatus] = useState<string | null>(null);
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [noiseThreshold, setNoiseThreshold] = useState<number | null>(null);
+  const [enableVAD, setEnableVAD] = useState(import.meta.env.VITE_ENABLE_VAD !== 'false');
   const recorderRef = useRef<AudioRecorder | null>(null);
   const wsClientRef = useRef<WebSocketClient | null>(null);
   const audioTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -67,10 +68,15 @@ export default function VoiceAssistant() {
         addLog(`Token valid until: ${expiry.toLocaleDateString()}`);
       }
 
-      // Start audio recording and calibration FIRST
+      // Start audio recording and calibration FIRST (if VAD enabled)
       addLog('Starting audio recording...');
-      setIsCalibrating(true);
-      addLog('Calibrating microphone - please remain quiet for 2 seconds...');
+
+      if (enableVAD) {
+        setIsCalibrating(true);
+        addLog('Calibrating microphone - please remain quiet for 2 seconds...');
+      } else {
+        addLog('VAD disabled - sending all audio continuously');
+      }
 
       // Create a promise that resolves when calibration is complete
       let calibrationResolve: () => void;
@@ -89,14 +95,17 @@ export default function VoiceAssistant() {
           // Calibration complete callback
           setIsCalibrating(false);
           setNoiseThreshold(threshold);
-          addLog(`Calibration complete! Noise threshold: ${threshold.toFixed(4)}`);
+          if (threshold > 0) {
+            addLog(`Calibration complete! Noise threshold: ${threshold.toFixed(4)}`);
+          }
           calibrationResolve();
-        }
+        },
+        enableVAD
       );
 
       await recorderRef.current.start();
 
-      // Wait for calibration to complete
+      // Wait for calibration to complete (or skip if VAD disabled)
       await calibrationPromise;
       addLog('Connecting to voice assistant...');
 
@@ -223,7 +232,7 @@ export default function VoiceAssistant() {
           </h1>
         </div>
 
-        <div className="mb-4">
+        <div className="mb-4 space-y-2">
           <button
             onClick={handleToggleConnection}
             className={`w-full py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-all shadow-lg ${
@@ -244,6 +253,29 @@ export default function VoiceAssistant() {
               </>
             )}
           </button>
+
+          {!isConnected && (
+            <button
+              onClick={() => setEnableVAD(!enableVAD)}
+              className={`w-full py-2 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-all ${
+                enableVAD
+                  ? 'bg-blue-600 hover:bg-blue-700'
+                  : 'bg-slate-600 hover:bg-slate-700'
+              }`}
+            >
+              {enableVAD ? (
+                <>
+                  <MicOff className="w-4 h-4" />
+                  VAD: ON (filters silence)
+                </>
+              ) : (
+                <>
+                  <Mic className="w-4 h-4" />
+                  VAD: OFF (sends all audio)
+                </>
+              )}
+            </button>
+          )}
         </div>
 
         {isConnected && (

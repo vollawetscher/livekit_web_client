@@ -9,6 +9,7 @@ export class AudioRecorder {
   private lastLogTime = 0;
 
   // Voice Activity Detection (VAD) properties
+  private enableVAD: boolean;
   private isCalibrating = true;
   private calibrationSamples: number[] = [];
   private calibrationStartTime = 0;
@@ -19,11 +20,13 @@ export class AudioRecorder {
   constructor(
     onAudioData: (data: ArrayBuffer) => void,
     onAudioLevel?: (level: number) => void,
-    onCalibrationComplete?: (threshold: number) => void
+    onCalibrationComplete?: (threshold: number) => void,
+    enableVAD: boolean = true
   ) {
     this.onAudioData = onAudioData;
     this.onAudioLevel = onAudioLevel;
     this.onCalibrationComplete = onCalibrationComplete;
+    this.enableVAD = enableVAD;
   }
 
   async start(): Promise<void> {
@@ -77,11 +80,20 @@ export class AudioRecorder {
       console.log(`🎤 [AudioRecorder] AudioContext state changed to: ${this.audioContext?.state}`);
     });
 
-    // Start calibration immediately
-    this.isCalibrating = true;
-    this.calibrationSamples = [];
-    this.calibrationStartTime = Date.now();
-    console.log('🎯 [AudioRecorder] Starting noise calibration (please remain quiet for 2 seconds)...');
+    // Start calibration immediately (only if VAD is enabled)
+    if (this.enableVAD) {
+      this.isCalibrating = true;
+      this.calibrationSamples = [];
+      this.calibrationStartTime = Date.now();
+      console.log('🎯 [AudioRecorder] VAD enabled - Starting noise calibration (please remain quiet for 2 seconds)...');
+    } else {
+      this.isCalibrating = false;
+      console.log('🔇 [AudioRecorder] VAD disabled - Sending all audio continuously');
+      // Immediately notify that calibration is "complete" (skipped)
+      if (this.onCalibrationComplete) {
+        this.onCalibrationComplete(0);
+      }
+    }
 
     const source = this.audioContext.createMediaStreamSource(this.mediaStream);
 
@@ -133,13 +145,17 @@ export class AudioRecorder {
         return;
       }
 
-      // Voice Activity Detection: Only send audio if level exceeds threshold
-      const shouldSendAudio = rms > this.noiseThreshold;
+      // Voice Activity Detection: Only send audio if level exceeds threshold (when VAD enabled)
+      const shouldSendAudio = !this.enableVAD || rms > this.noiseThreshold;
 
       // Log every 5 seconds
       const now = Date.now();
       if (now - this.lastLogTime > 5000) {
-        console.log(`🎤 [AudioRecorder] chunk ${this.chunkCount}, level: ${level.toFixed(3)}, RMS: ${rms.toFixed(4)}, threshold: ${this.noiseThreshold.toFixed(4)}, sending: ${shouldSendAudio}`);
+        if (this.enableVAD) {
+          console.log(`🎤 [AudioRecorder] chunk ${this.chunkCount}, level: ${level.toFixed(3)}, RMS: ${rms.toFixed(4)}, threshold: ${this.noiseThreshold.toFixed(4)}, sending: ${shouldSendAudio}`);
+        } else {
+          console.log(`🎤 [AudioRecorder] chunk ${this.chunkCount}, level: ${level.toFixed(3)}, RMS: ${rms.toFixed(4)}, VAD disabled - always sending`);
+        }
         this.lastLogTime = now;
       }
 
@@ -147,7 +163,7 @@ export class AudioRecorder {
         this.onAudioLevel(level);
       }
 
-      // Only send audio if it exceeds the threshold (voice detected)
+      // Send audio if VAD is disabled or if it exceeds the threshold (voice detected)
       if (shouldSendAudio) {
         const pcm16 = new Int16Array(inputData.length);
         for (let i = 0; i < inputData.length; i++) {
