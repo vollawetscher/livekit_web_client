@@ -3,6 +3,7 @@ import { Mic, MicOff, Wifi, WifiOff, Bug } from 'lucide-react';
 import { AudioRecorder } from '../utils/AudioRecorder';
 import { WebSocketClient } from '../utils/WebSocketClient';
 import { DialService } from '../utils/DialService';
+import { TokenManager } from '../utils/TokenManager';
 import Dialpad from './Dialpad';
 
 export default function VoiceAssistant() {
@@ -20,6 +21,7 @@ export default function VoiceAssistant() {
   const recorderRef = useRef<AudioRecorder | null>(null);
   const wsClientRef = useRef<WebSocketClient | null>(null);
   const audioTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const tokenManagerRef = useRef<TokenManager | null>(null);
 
   const addLog = (message: string) => {
     const timestamp = new Date().toLocaleTimeString();
@@ -29,16 +31,16 @@ export default function VoiceAssistant() {
   // Load values from environment on mount
   useEffect(() => {
     const envUrl = import.meta.env.VITE_SERVER_URL;
-    const envToken = import.meta.env.VITE_JWT_TOKEN;
 
     if (envUrl) {
       setServerUrl(envUrl);
       addLog('Loaded server URL from environment');
-    }
 
-    if (envToken) {
-      setJwtToken(envToken);
-      addLog('Loaded JWT token from environment');
+      // Initialize TokenManager
+      const url = new URL(envUrl);
+      const baseUrl = `${url.protocol}//${url.host}`.replace('wss:', 'https:').replace('ws:', 'http:');
+      tokenManagerRef.current = new TokenManager(baseUrl);
+      addLog('Token manager initialized');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -49,45 +51,20 @@ export default function VoiceAssistant() {
       return;
     }
 
+    if (!tokenManagerRef.current) {
+      alert('Token manager not initialized. Please refresh the page.');
+      return;
+    }
+
     try {
-      let token = jwtToken;
+      addLog('Requesting authentication token...');
+      const token = await tokenManagerRef.current.getToken();
+      setJwtToken(token);
+      addLog('Token acquired successfully');
 
-      // If no JWT provided in environment, fetch one from the server
-      if (!token) {
-        addLog('Requesting authentication token...');
-
-        try {
-          // Extract base URL and construct token endpoint
-          const url = new URL(serverUrl);
-          const baseUrl = `${url.protocol}//${url.host}`;
-          const tokenUrl = `${baseUrl.replace('wss:', 'https:').replace('ws:', 'http:')}/api/mobile/auth/token`;
-
-          addLog(`Token URL: ${tokenUrl}`);
-          console.log('🔑 Fetching token from:', tokenUrl);
-
-          const tokenResponse = await fetch(tokenUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: 'test-user', deviceId: 'web-test' }),
-          });
-
-          if (!tokenResponse.ok) {
-            throw new Error(`Token fetch failed: ${tokenResponse.status} ${tokenResponse.statusText}`);
-          }
-
-          const data = await tokenResponse.json();
-          token = data.token;
-          addLog('Token received from server');
-          console.log('🔑 Token received, length:', token?.length);
-
-          setJwtToken(token);
-        } catch (error) {
-          const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-          addLog(`Token fetch failed: ${errorMsg}`);
-          throw new Error(`Failed to get authentication token: ${errorMsg}`);
-        }
-      } else {
-        addLog('Using JWT token from environment');
+      const expiry = tokenManagerRef.current.getTokenExpiry();
+      if (expiry) {
+        addLog(`Token valid until: ${expiry.toLocaleDateString()}`);
       }
 
       addLog('Connecting to WebSocket...');
