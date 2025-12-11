@@ -10,6 +10,7 @@ export default function VoiceAssistant() {
   const [serverUrl, setServerUrl] = useState('');
   const [jwtToken, setJwtToken] = useState('');
   const [logs, setLogs] = useState<string[]>([]);
+  const [isLogsExpanded, setIsLogsExpanded] = useState(false);
   const [inputLevel, setInputLevel] = useState(0);
   const [isReceivingAudio, setIsReceivingAudio] = useState(false);
   const [isDialing, setIsDialing] = useState(false);
@@ -157,6 +158,14 @@ export default function VoiceAssistant() {
     addLog('Disconnected');
   };
 
+  const handleToggleConnection = () => {
+    if (isConnected) {
+      handleStop();
+    } else {
+      handleStart();
+    }
+  };
+
   const handleDebugStatus = () => {
     console.log('🔍 ===== DEBUG STATUS DUMP =====');
     if (wsClientRef.current) {
@@ -217,63 +226,54 @@ export default function VoiceAssistant() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 text-white">
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-2 flex items-center justify-center gap-2">
-            <Mic className="w-8 h-8" />
+      <div className="container mx-auto px-4 py-4 max-w-2xl">
+        <div className="text-center mb-4">
+          <h1 className="text-2xl font-bold flex items-center justify-center gap-2">
+            <Mic className="w-6 h-6" />
             Voice Assistant
           </h1>
-          <p className="text-slate-400 text-sm">Mobile Test Client</p>
         </div>
 
-        <div
-          className={`mb-6 p-4 rounded-lg flex items-center gap-3 transition-colors ${
-            isConnected
-              ? 'bg-green-900/30 border border-green-500/50'
-              : 'bg-red-900/30 border border-red-500/50'
-          }`}
-        >
-          {isConnected ? (
-            <>
-              <Wifi className="w-5 h-5 text-green-400" />
-              <span className="text-green-300 font-medium">Connected</span>
-            </>
-          ) : (
-            <>
-              <WifiOff className="w-5 h-5 text-red-400" />
-              <span className="text-red-300 font-medium">Disconnected</span>
-            </>
-          )}
+        <div className="mb-4">
+          <button
+            onClick={handleToggleConnection}
+            className={`w-full py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-all shadow-lg ${
+              isConnected
+                ? 'bg-red-600 hover:bg-red-700 active:scale-95'
+                : 'bg-green-600 hover:bg-green-700 active:scale-95'
+            }`}
+          >
+            {isConnected ? (
+              <>
+                <Wifi className="w-5 h-5" />
+                Disconnect
+              </>
+            ) : (
+              <>
+                <WifiOff className="w-5 h-5" />
+                Connect
+              </>
+            )}
+          </button>
         </div>
 
         {isConnected && (
-          <div className="mb-6 space-y-3">
+          <div className="mb-4 space-y-2">
             {isCalibrating && (
-              <div className="bg-yellow-900/30 border border-yellow-500/50 rounded-lg p-4 animate-pulse">
-                <div className="flex items-center gap-3">
-                  <div className="w-4 h-4 rounded-full bg-yellow-400 animate-ping" />
-                  <div>
-                    <p className="text-yellow-300 font-medium text-sm">Calibrating Microphone...</p>
-                    <p className="text-yellow-200/70 text-xs mt-1">Please remain quiet for 2 seconds</p>
-                  </div>
+              <div className="bg-yellow-900/30 border border-yellow-500/50 rounded-lg p-2 animate-pulse">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-yellow-400 animate-ping" />
+                  <p className="text-yellow-300 text-xs">Calibrating... remain quiet</p>
                 </div>
               </div>
             )}
 
-            {!isCalibrating && noiseThreshold !== null && (
-              <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-3">
-                <p className="text-blue-300 text-xs">
-                  Voice detection active - Only audio above noise threshold is transmitted
-                </p>
+            <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-2">
+              <div className="flex items-center gap-2 mb-1">
+                <Mic className="w-3 h-3 text-blue-400" />
+                <span className="text-xs font-medium text-slate-300">Mic</span>
               </div>
-            )}
-
-            <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-4">
-              <div className="flex items-center gap-3 mb-2">
-                <Mic className="w-4 h-4 text-blue-400" />
-                <span className="text-sm font-medium text-slate-300">Microphone Input</span>
-              </div>
-              <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-75"
                   style={{ width: `${inputLevel * 100}%` }}
@@ -281,12 +281,12 @@ export default function VoiceAssistant() {
               </div>
             </div>
 
-            <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-4">
-              <div className="flex items-center gap-3 mb-2">
-                <div className={`w-4 h-4 rounded-full transition-colors ${isReceivingAudio ? 'bg-green-400' : 'bg-slate-600'}`} />
-                <span className="text-sm font-medium text-slate-300">Assistant Speaking</span>
+            <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-2">
+              <div className="flex items-center gap-2 mb-1">
+                <div className={`w-3 h-3 rounded-full transition-colors ${isReceivingAudio ? 'bg-green-400' : 'bg-slate-600'}`} />
+                <span className="text-xs font-medium text-slate-300">Assistant</span>
               </div>
-              <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
                 <div
                   className={`h-full transition-all duration-200 ${
                     isReceivingAudio
@@ -296,40 +296,16 @@ export default function VoiceAssistant() {
                 />
               </div>
             </div>
-          </div>
-        )}
 
-        <div className="space-y-3 mb-8">
-          <div className="flex gap-3">
-            <button
-              onClick={handleStart}
-              disabled={isConnected}
-              className="flex-1 py-4 rounded-lg font-semibold text-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-green-600 hover:bg-green-700 active:scale-95 shadow-lg"
-            >
-              <Mic className="w-6 h-6" />
-              Start Call
-            </button>
-
-            <button
-              onClick={handleStop}
-              disabled={!isConnected}
-              className="flex-1 py-4 rounded-lg font-semibold text-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-red-600 hover:bg-red-700 active:scale-95 shadow-lg"
-            >
-              <MicOff className="w-6 h-6" />
-              Stop Call
-            </button>
-          </div>
-
-          {isConnected && (
             <button
               onClick={handleDebugStatus}
-              className="w-full py-2 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-all bg-slate-700 hover:bg-slate-600"
+              className="w-full py-1.5 rounded-lg font-medium text-xs flex items-center justify-center gap-1 transition-all bg-slate-700 hover:bg-slate-600"
             >
-              <Bug className="w-4 h-4" />
-              Log Debug Status
+              <Bug className="w-3 h-3" />
+              Debug
             </button>
-          )}
-        </div>
+          </div>
+        )}
 
         {isConnected && (
           <div className="mb-8">
@@ -342,27 +318,44 @@ export default function VoiceAssistant() {
         )}
 
         <div className="bg-slate-800/50 rounded-lg border border-slate-700">
-          <div className="px-4 py-3 border-b border-slate-700">
-            <h2 className="font-semibold text-sm text-slate-300">Activity Log</h2>
-          </div>
-          <div className="p-4 max-h-64 overflow-y-auto">
-            {logs.length === 0 ? (
-              <p className="text-slate-500 text-sm italic">
-                No activity yet...
-              </p>
-            ) : (
-              <div className="space-y-1">
-                {logs.map((log, index) => (
-                  <div
-                    key={index}
-                    className="text-xs font-mono text-slate-300 break-words"
-                  >
-                    {log}
-                  </div>
-                ))}
+          <button
+            onClick={() => setIsLogsExpanded(!isLogsExpanded)}
+            className="w-full px-3 py-2 flex items-center justify-between hover:bg-slate-700/50 transition-colors rounded-lg"
+          >
+            <span className="font-semibold text-xs text-slate-300">Activity Log</span>
+            <span className="text-slate-400 text-xs">
+              {isLogsExpanded ? '▼' : '▶'}
+            </span>
+          </button>
+
+          {!isLogsExpanded && logs.length > 0 && (
+            <div className="px-3 pb-2">
+              <div className="text-xs font-mono text-slate-300 truncate">
+                {logs[logs.length - 1]}
               </div>
-            )}
-          </div>
+            </div>
+          )}
+
+          {isLogsExpanded && (
+            <div className="px-3 pb-2 max-h-48 overflow-y-auto">
+              {logs.length === 0 ? (
+                <p className="text-slate-500 text-xs italic">
+                  No activity yet...
+                </p>
+              ) : (
+                <div className="space-y-1">
+                  {logs.map((log, index) => (
+                    <div
+                      key={index}
+                      className="text-xs font-mono text-slate-300 break-words"
+                    >
+                      {log}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
