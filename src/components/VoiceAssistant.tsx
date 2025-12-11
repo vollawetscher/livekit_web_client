@@ -1,20 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, Wifi, WifiOff, Trash2, Bug } from 'lucide-react';
+import { Mic, MicOff, Wifi, WifiOff, Bug } from 'lucide-react';
 import { AudioRecorder } from '../utils/AudioRecorder';
 import { WebSocketClient } from '../utils/WebSocketClient';
 import { DialService } from '../utils/DialService';
 import Dialpad from './Dialpad';
 
-const STORAGE_KEYS = {
-  SERVER_URL: 'voice_assistant_server_url',
-  JWT_TOKEN: 'voice_assistant_jwt_token',
-};
-
 export default function VoiceAssistant() {
   const [isConnected, setIsConnected] = useState(false);
   const [serverUrl, setServerUrl] = useState('');
   const [jwtToken, setJwtToken] = useState('');
-  const [useManualJwt, setUseManualJwt] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [inputLevel, setInputLevel] = useState(0);
   const [isReceivingAudio, setIsReceivingAudio] = useState(false);
@@ -31,28 +25,18 @@ export default function VoiceAssistant() {
     setLogs((prev) => [...prev, `[${timestamp}] ${message}`]);
   };
 
-  // Load saved values on mount
+  // Load values from environment on mount
   useEffect(() => {
     const envUrl = import.meta.env.VITE_SERVER_URL;
     const envToken = import.meta.env.VITE_JWT_TOKEN;
-    const savedUrl = localStorage.getItem(STORAGE_KEYS.SERVER_URL);
-    const savedToken = localStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
 
-    if (savedUrl) {
-      setServerUrl(savedUrl);
-      addLog('Loaded saved server URL');
-    } else if (envUrl) {
+    if (envUrl) {
       setServerUrl(envUrl);
       addLog('Loaded server URL from environment');
     }
 
-    if (savedToken) {
-      setJwtToken(savedToken);
-      setUseManualJwt(true);
-      addLog('Loaded saved JWT token');
-    } else if (envToken) {
+    if (envToken) {
       setJwtToken(envToken);
-      setUseManualJwt(true);
       addLog('Loaded JWT token from environment');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -60,15 +44,15 @@ export default function VoiceAssistant() {
 
   const handleStart = async () => {
     if (!serverUrl) {
-      alert('Please enter server URL');
+      alert('Server URL not configured. Please set VITE_SERVER_URL in your .env file.');
       return;
     }
 
     try {
       let token = jwtToken;
 
-      // If no manual JWT provided, fetch one from the server
-      if (!useManualJwt || !token) {
+      // If no JWT provided in environment, fetch one from the server
+      if (!token) {
         addLog('Requesting authentication token...');
 
         try {
@@ -95,20 +79,15 @@ export default function VoiceAssistant() {
           addLog('Token received from server');
           console.log('🔑 Token received, length:', token?.length);
 
-          // Save the token for future use
           setJwtToken(token);
-          localStorage.setItem(STORAGE_KEYS.JWT_TOKEN, token);
         } catch (error) {
           const errorMsg = error instanceof Error ? error.message : 'Unknown error';
           addLog(`Token fetch failed: ${errorMsg}`);
           throw new Error(`Failed to get authentication token: ${errorMsg}`);
         }
       } else {
-        addLog('Using saved JWT token');
+        addLog('Using JWT token from environment');
       }
-
-      // Save server URL
-      localStorage.setItem(STORAGE_KEYS.SERVER_URL, serverUrl);
 
       addLog('Connecting to WebSocket...');
       wsClientRef.current = new WebSocketClient(
@@ -176,15 +155,6 @@ export default function VoiceAssistant() {
     setIsCalibrating(false);
     setNoiseThreshold(null);
     addLog('Disconnected');
-  };
-
-  const handleClearSaved = () => {
-    localStorage.removeItem(STORAGE_KEYS.SERVER_URL);
-    localStorage.removeItem(STORAGE_KEYS.JWT_TOKEN);
-    setServerUrl('');
-    setJwtToken('');
-    setUseManualJwt(false);
-    addLog('Cleared saved data');
   };
 
   const handleDebugStatus = () => {
@@ -328,61 +298,6 @@ export default function VoiceAssistant() {
             </div>
           </div>
         )}
-
-        <div className="mb-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              Server URL
-            </label>
-            <input
-              type="text"
-              value={serverUrl}
-              onChange={(e) => setServerUrl(e.target.value)}
-              placeholder="wss://your-server.com/mobile-stream"
-              disabled={isConnected}
-              className="w-full px-4 py-3 rounded-lg bg-slate-700 border border-slate-600 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed text-white placeholder-slate-400"
-            />
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm font-medium text-slate-300">
-                JWT Token (Optional)
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={useManualJwt}
-                  onChange={(e) => setUseManualJwt(e.target.checked)}
-                  disabled={isConnected}
-                  className="w-4 h-4 rounded bg-slate-700 border-slate-600 text-blue-500 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-                <span className="text-xs text-slate-400">Use manual JWT</span>
-              </label>
-            </div>
-            <input
-              type="text"
-              value={jwtToken}
-              onChange={(e) => {
-                setJwtToken(e.target.value);
-                localStorage.setItem(STORAGE_KEYS.JWT_TOKEN, e.target.value);
-              }}
-              placeholder="Paste JWT token or leave empty to auto-fetch"
-              disabled={isConnected || !useManualJwt}
-              className="w-full px-4 py-3 rounded-lg bg-slate-700 border border-slate-600 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed text-white placeholder-slate-400 font-mono text-xs"
-            />
-          </div>
-
-          {(serverUrl || jwtToken) && !isConnected && (
-            <button
-              onClick={handleClearSaved}
-              className="w-full py-2 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-all bg-slate-700 hover:bg-slate-600 text-slate-300"
-            >
-              <Trash2 className="w-4 h-4" />
-              Clear Saved Data
-            </button>
-          )}
-        </div>
 
         <div className="space-y-3 mb-8">
           <div className="flex gap-3">
