@@ -5,7 +5,6 @@ import { WebSocketClient } from '../utils/WebSocketClient';
 import { DialService } from '../utils/DialService';
 import { TokenManager } from '../utils/TokenManager';
 import Dialpad from './Dialpad';
-import ContactPicker from './ContactPicker';
 
 export default function VoiceAssistant() {
   const [isConnected, setIsConnected] = useState(false);
@@ -330,12 +329,7 @@ export default function VoiceAssistant() {
         )}
 
         {isConnected && (
-          <div className="mb-8 space-y-4">
-            <ContactPicker
-              onDial={handleDial}
-              isDialing={isDialing}
-            />
-
+          <div className="mb-8">
             <Dialpad
               onDial={handleDial}
               isDialing={isDialing}
