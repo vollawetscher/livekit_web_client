@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { Mic, MicOff, Wifi, WifiOff, Bug } from 'lucide-react';
 import { AudioRecorder } from '../utils/AudioRecorder';
-import { WebSocketClient } from '../utils/WebSocketClient';
+import { WebSocketClient, CallStatusEvent } from '../utils/WebSocketClient';
 import { DialService } from '../utils/DialService';
 import { TokenManager } from '../utils/TokenManager';
+import { insertCallHistory, updateCallHistory } from '../utils/supabase';
 import Dialpad from './Dialpad';
+import CallHistory from './CallHistory';
 
 export default function VoiceAssistant() {
   const [isConnected, setIsConnected] = useState(false);
@@ -16,6 +18,9 @@ export default function VoiceAssistant() {
   const [isReceivingAudio, setIsReceivingAudio] = useState(false);
   const [isDialing, setIsDialing] = useState(false);
   const [callStatus, setCallStatus] = useState<string | null>(null);
+  const [activeCallId, setActiveCallId] = useState<string | null>(null);
+  const [isCallActive, setIsCallActive] = useState(false);
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [noiseThreshold, setNoiseThreshold] = useState<number | null>(null);
   const [enableVAD, setEnableVAD] = useState(import.meta.env.VITE_ENABLE_VAD !== 'false');
@@ -23,10 +28,37 @@ export default function VoiceAssistant() {
   const wsClientRef = useRef<WebSocketClient | null>(null);
   const audioTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const tokenManagerRef = useRef<TokenManager | null>(null);
+  const currentCallDataRef = useRef<{ phoneNumber: string; contactName: string } | null>(null);
 
   const addLog = (message: string) => {
     const timestamp = new Date().toLocaleTimeString();
     setLogs((prev) => [...prev, `[${timestamp}] ${message}`]);
+  };
+
+  const handleCallStatus = async (event: CallStatusEvent) => {
+    addLog(`Call status: ${event.status} (${event.phoneNumber})`);
+    setCallStatus(event.status);
+    setActiveCallId(event.callId);
+
+    const isActive = ['initiated', 'ringing', 'in-progress', 'answered'].includes(event.status);
+    setIsCallActive(isActive);
+
+    const isTerminal = ['completed', 'failed', 'busy', 'no-answer'].includes(event.status);
+    if (isTerminal) {
+      setTimeout(() => {
+        setCallStatus(null);
+        setActiveCallId(null);
+        setIsCallActive(false);
+        currentCallDataRef.current = null;
+      }, 3000);
+    }
+
+    try {
+      await updateCallHistory(event.callId, event.status);
+      setHistoryRefreshKey(prev => prev + 1);
+    } catch (error) {
+      console.error('Failed to update call history:', error);
+    }
   };
 
   // Load values from environment on mount
@@ -118,7 +150,8 @@ export default function VoiceAssistant() {
           setIsReceivingAudio(true);
           if (audioTimeoutRef.current) clearTimeout(audioTimeoutRef.current);
           audioTimeoutRef.current = setTimeout(() => setIsReceivingAudio(false), 200);
-        }
+        },
+        handleCallStatus
       );
       await wsClientRef.current.connect();
 
@@ -189,34 +222,53 @@ export default function VoiceAssistant() {
     try {
       setIsDialing(true);
       setCallStatus('Initiating call...');
+      setIsCallActive(true);
       addLog(`Dialing ${contactName} at ${phoneNumber}...`);
+
+      currentCallDataRef.current = { phoneNumber, contactName };
 
       const sessionId = wsClientRef.current.getSessionId();
 
-      // Extract base URL from WebSocket URL
       const url = new URL(serverUrl);
       const baseUrl = `${url.protocol}//${url.host}`.replace('wss:', 'https:').replace('ws:', 'http:');
 
       const dialService = new DialService(baseUrl, jwtToken);
       const result = await dialService.dialContact(phoneNumber, contactName, sessionId);
 
-      setCallStatus(`Call ${result.status} - ${result.message}`);
+      setCallStatus('initiated');
+      setActiveCallId(result.callId);
       addLog(`Call initiated: ${result.callId}`);
       addLog(`Twilio SID: ${result.twilioCallSid}`);
 
-      // Clear status after 5 seconds
-      setTimeout(() => {
-        setCallStatus(null);
-      }, 5000);
+      await insertCallHistory({
+        phone_number: phoneNumber,
+        contact_name: contactName,
+        call_id: result.callId,
+        status: 'initiated',
+        timestamp: new Date().toISOString(),
+      });
+
+      setHistoryRefreshKey(prev => prev + 1);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      setCallStatus(`Call failed: ${errorMessage}`);
+      setCallStatus(`failed`);
       addLog(`Dial error: ${errorMessage}`);
+      setIsCallActive(false);
 
-      // Clear error status after 5 seconds
+      if (currentCallDataRef.current) {
+        await insertCallHistory({
+          phone_number: currentCallDataRef.current.phoneNumber,
+          contact_name: currentCallDataRef.current.contactName,
+          status: 'failed',
+          timestamp: new Date().toISOString(),
+        });
+        setHistoryRefreshKey(prev => prev + 1);
+      }
+
       setTimeout(() => {
         setCallStatus(null);
-      }, 5000);
+        currentCallDataRef.current = null;
+      }, 3000);
     } finally {
       setIsDialing(false);
     }
@@ -329,13 +381,49 @@ export default function VoiceAssistant() {
         )}
 
         {isConnected && (
-          <div className="mb-8">
-            <Dialpad
-              onDial={handleDial}
-              isDialing={isDialing}
-              callStatus={callStatus}
-            />
-          </div>
+          <>
+            {callStatus && (
+              <div className={`mb-4 p-4 rounded-lg border ${
+                callStatus === 'ringing' || callStatus === 'initiated'
+                  ? 'bg-blue-900/30 border-blue-500/50'
+                  : callStatus === 'answered' || callStatus === 'in-progress'
+                  ? 'bg-green-900/30 border-green-500/50'
+                  : callStatus === 'completed'
+                  ? 'bg-slate-800/50 border-slate-500/50'
+                  : 'bg-red-900/30 border-red-500/50'
+              }`}>
+                <p className={`text-sm font-medium capitalize text-center ${
+                  callStatus === 'ringing' || callStatus === 'initiated'
+                    ? 'text-blue-300'
+                    : callStatus === 'answered' || callStatus === 'in-progress'
+                    ? 'text-green-300'
+                    : callStatus === 'completed'
+                    ? 'text-slate-300'
+                    : 'text-red-300'
+                }`}>
+                  {callStatus === 'in-progress' ? 'Call Connected' : callStatus.replace('-', ' ')}
+                </p>
+              </div>
+            )}
+
+            <div className="mb-4">
+              <Dialpad
+                onDial={handleDial}
+                isDialing={isDialing}
+                callStatus={callStatus}
+                isCallActive={isCallActive}
+              />
+            </div>
+
+            <div className="mb-8">
+              <CallHistory
+                onRedial={handleDial}
+                isDialing={isDialing || isCallActive}
+                currentCallId={activeCallId || undefined}
+                refreshTrigger={historyRefreshKey}
+              />
+            </div>
+          </>
         )}
 
         <div className="bg-slate-800/50 rounded-lg border border-slate-700">

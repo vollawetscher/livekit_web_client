@@ -1,9 +1,18 @@
+export interface CallStatusEvent {
+  event: 'call-status';
+  status: string;
+  callId: string;
+  phoneNumber: string;
+  timestamp: number;
+}
+
 export class WebSocketClient {
   private url: string;
   private token: string;
   private ws: WebSocket | null = null;
   private onLogMessage: (msg: string) => void;
   private onAudioReceived?: () => void;
+  private onCallStatus?: (event: CallStatusEvent) => void;
   private isReady = false;
   private sessionId: string = '';
 
@@ -16,11 +25,18 @@ export class WebSocketClient {
   private audioSentCount = 0;
   private lastSendLogTime = 0;
 
-  constructor(url: string, token: string, onLogMessage: (msg: string) => void, onAudioReceived?: () => void) {
+  constructor(
+    url: string,
+    token: string,
+    onLogMessage: (msg: string) => void,
+    onAudioReceived?: () => void,
+    onCallStatus?: (event: CallStatusEvent) => void
+  ) {
     this.url = url;
     this.token = token;
     this.onLogMessage = onLogMessage;
     this.onAudioReceived = onAudioReceived;
+    this.onCallStatus = onCallStatus;
 
     // Don't create AudioContext in constructor - will create it lazily on connect
     // This avoids mobile browser restrictions on AudioContext creation
@@ -126,6 +142,12 @@ export class WebSocketClient {
           } else if (data.event === 'transcript') {
             console.log('📝 Transcript:', data.text);
             this.onLogMessage('Transcript: ' + data.text);
+          } else if (data.event === 'call-status') {
+            console.log('📞 Call status update:', data);
+            this.onLogMessage(`Call status: ${data.status} - ${data.phoneNumber}`);
+            if (this.onCallStatus) {
+              this.onCallStatus(data as CallStatusEvent);
+            }
           } else {
             console.log(`⚠️ [WebSocketClient] Unknown event: ${data.event}`, data);
           }

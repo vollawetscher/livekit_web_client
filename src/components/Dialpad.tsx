@@ -5,22 +5,29 @@ interface DialpadProps {
   onDial: (phoneNumber: string, contactName: string) => void;
   isDialing: boolean;
   callStatus: string | null;
+  isCallActive: boolean;
 }
 
-export default function Dialpad({ onDial, isDialing, callStatus }: DialpadProps) {
+export default function Dialpad({ onDial, isDialing, callStatus, isCallActive }: DialpadProps) {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [contactName, setContactName] = useState('');
 
+  const isDisabled = isDialing || isCallActive;
+
   const handleNumberClick = (digit: string) => {
-    setPhoneNumber((prev) => prev + digit);
+    if (!isDisabled) {
+      setPhoneNumber((prev) => prev + digit);
+    }
   };
 
   const handleDelete = () => {
-    setPhoneNumber((prev) => prev.slice(0, -1));
+    if (!isDisabled) {
+      setPhoneNumber((prev) => prev.slice(0, -1));
+    }
   };
 
   const handleDial = () => {
-    if (phoneNumber) {
+    if (phoneNumber && !isDisabled) {
       onDial(phoneNumber, contactName || 'Unknown');
     }
   };
@@ -71,7 +78,7 @@ export default function Dialpad({ onDial, isDialing, callStatus }: DialpadProps)
             onChange={(e) => setContactName(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Enter name"
-            disabled={isDialing}
+            disabled={isDisabled}
             className="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm placeholder-slate-400"
           />
         </div>
@@ -87,13 +94,13 @@ export default function Dialpad({ onDial, isDialing, callStatus }: DialpadProps)
               onChange={(e) => setPhoneNumber(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="+1234567890"
-              disabled={isDialing}
+              disabled={isDisabled}
               className="w-full px-3 py-3 pr-12 rounded-lg bg-slate-700 border border-slate-600 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed text-white text-lg font-mono tracking-wider text-center placeholder-slate-400"
             />
             {phoneNumber && (
               <button
                 onClick={handleDelete}
-                disabled={isDialing}
+                disabled={isDisabled}
                 className="absolute right-2 top-1/2 -translate-y-1/2 p-2 hover:bg-slate-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Delete className="w-4 h-4 text-slate-400" />
@@ -108,7 +115,7 @@ export default function Dialpad({ onDial, isDialing, callStatus }: DialpadProps)
           <button
             key={button.value}
             onClick={() => handleNumberClick(button.value)}
-            disabled={isDialing}
+            disabled={isDisabled}
             className="aspect-square rounded-lg bg-slate-700 hover:bg-slate-600 active:bg-slate-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-slate-600 hover:border-slate-500"
           >
             <div className="flex flex-col items-center justify-center">
@@ -123,11 +130,11 @@ export default function Dialpad({ onDial, isDialing, callStatus }: DialpadProps)
 
       <button
         onClick={handleDial}
-        disabled={!phoneNumber || isDialing}
+        disabled={!phoneNumber || isDisabled}
         className="w-full py-4 rounded-lg font-semibold text-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-green-600 hover:bg-green-700 active:scale-95 shadow-lg"
       >
         <Phone className="w-5 h-5" />
-        {isDialing ? 'Dialing...' : 'Call'}
+        {isDialing ? 'Dialing...' : isCallActive ? 'Call in Progress' : 'Call'}
       </button>
 
       <p className="text-xs text-slate-400 mt-3 text-center">
