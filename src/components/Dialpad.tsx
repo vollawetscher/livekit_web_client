@@ -106,7 +106,7 @@ export default function Dialpad({ onDial, onHangup, isDialing, callStatus, isCal
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 mb-3">
+      <div className="grid grid-cols-3 gap-1.5 mb-2">
         {dialpadButtons.map((button) => (
           <button
             key={button.value}
@@ -115,9 +115,9 @@ export default function Dialpad({ onDial, onHangup, isDialing, callStatus, isCal
             className="aspect-square rounded bg-slate-700 hover:bg-slate-600 active:bg-slate-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-slate-600 hover:border-slate-500"
           >
             <div className="flex flex-col items-center justify-center">
-              <span className="text-xl font-semibold text-white">{button.display}</span>
+              <span className="text-lg font-semibold text-white">{button.display}</span>
               {button.sub && (
-                <span className="text-[9px] text-slate-400 mt-0.5">{button.sub}</span>
+                <span className="text-[8px] text-slate-400">{button.sub}</span>
               )}
             </div>
           </button>

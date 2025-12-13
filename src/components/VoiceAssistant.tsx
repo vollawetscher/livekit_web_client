@@ -333,12 +333,12 @@ export default function VoiceAssistant() {
             {enableVAD ? (
               <>
                 <MicOff className="w-3 h-3" />
-                VAD: ON
+                Filter Silence
               </>
             ) : (
               <>
                 <Mic className="w-3 h-3" />
-                VAD: OFF
+                All Audio
               </>
             )}
           </button>
