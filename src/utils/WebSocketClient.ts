@@ -335,6 +335,18 @@ export class WebSocketClient {
     console.log(`📊 [WebSocketClient] Status: ${this.getStatus()}`);
   }
 
+  sendStop(): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      console.warn('⚠️ [WebSocketClient] Cannot send stop - WebSocket not connected');
+      return;
+    }
+
+    console.log('📤 [WebSocketClient] Sending stop event');
+    this.send({
+      event: 'stop',
+    });
+  }
+
   disconnect(): void {
     // Clear audio queue and stop playback
     this.clearAudioQueue();

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, Wifi, WifiOff, Bug, PhoneOff } from 'lucide-react';
+import { Mic, MicOff, Wifi, WifiOff, Bug } from 'lucide-react';
 import { AudioRecorder } from '../utils/AudioRecorder';
 import { WebSocketClient, CallStatusEvent } from '../utils/WebSocketClient';
 import { DialService } from '../utils/DialService';
@@ -274,32 +274,15 @@ export default function VoiceAssistant() {
     }
   };
 
-  const handleHangup = async () => {
-    if (!activeCallId || !jwtToken || !serverUrl) {
+  const handleHangup = () => {
+    if (!wsClientRef.current || !isCallActive) {
       return;
     }
 
     try {
-      addLog(`Ending call ${activeCallId}...`);
-
-      const url = new URL(serverUrl);
-      const baseUrl = `${url.protocol}//${url.host}`.replace('wss:', 'https:').replace('ws:', 'http:');
-
-      const dialService = new DialService(baseUrl, jwtToken);
-      await dialService.hangupCall(activeCallId);
-
-      addLog('Call ended');
-      setCallStatus('completed');
-
-      await updateCallHistory(activeCallId, 'completed');
-      setHistoryRefreshKey(prev => prev + 1);
-
-      setTimeout(() => {
-        setCallStatus(null);
-        setActiveCallId(null);
-        setIsCallActive(false);
-        currentCallDataRef.current = null;
-      }, 2000);
+      addLog('Sending stop event to end call...');
+      wsClientRef.current.sendStop();
+      addLog('Stop event sent');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       addLog(`Hangup error: ${errorMessage}`);
@@ -424,7 +407,7 @@ export default function VoiceAssistant() {
                   ? 'bg-slate-800/50 border-slate-500/50'
                   : 'bg-red-900/30 border-red-500/50'
               }`}>
-                <p className={`text-sm font-medium capitalize text-center mb-3 ${
+                <p className={`text-sm font-medium capitalize text-center ${
                   callStatus === 'ringing' || callStatus === 'initiated'
                     ? 'text-blue-300'
                     : callStatus === 'answered' || callStatus === 'in-progress'
@@ -435,21 +418,13 @@ export default function VoiceAssistant() {
                 }`}>
                   {callStatus === 'in-progress' ? 'Call Connected' : callStatus.replace('-', ' ')}
                 </p>
-                {isCallActive && (
-                  <button
-                    onClick={handleHangup}
-                    className="w-full py-2 rounded-lg font-semibold flex items-center justify-center gap-2 transition-all bg-red-600 hover:bg-red-700 active:scale-95 text-white"
-                  >
-                    <PhoneOff className="w-4 h-4" />
-                    End Call
-                  </button>
-                )}
               </div>
             )}
 
             <div className="mb-4">
               <Dialpad
                 onDial={handleDial}
+                onHangup={handleHangup}
                 isDialing={isDialing}
                 callStatus={callStatus}
                 isCallActive={isCallActive}

@@ -1,14 +1,15 @@
 import { useState } from 'react';
-import { Phone, Delete, User } from 'lucide-react';
+import { Phone, Delete, User, PhoneOff } from 'lucide-react';
 
 interface DialpadProps {
   onDial: (phoneNumber: string, contactName: string) => void;
+  onHangup: () => void;
   isDialing: boolean;
   callStatus: string | null;
   isCallActive: boolean;
 }
 
-export default function Dialpad({ onDial, isDialing, callStatus, isCallActive }: DialpadProps) {
+export default function Dialpad({ onDial, onHangup, isDialing, callStatus, isCallActive }: DialpadProps) {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [contactName, setContactName] = useState('');
 
@@ -128,14 +129,25 @@ export default function Dialpad({ onDial, isDialing, callStatus, isCallActive }:
         ))}
       </div>
 
-      <button
-        onClick={handleDial}
-        disabled={!phoneNumber || isDisabled}
-        className="w-full py-4 rounded-lg font-semibold text-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-green-600 hover:bg-green-700 active:scale-95 shadow-lg"
-      >
-        <Phone className="w-5 h-5" />
-        {isDialing ? 'Dialing...' : isCallActive ? 'Call in Progress' : 'Call'}
-      </button>
+      <div className="grid grid-cols-2 gap-3">
+        <button
+          onClick={handleDial}
+          disabled={!phoneNumber || isDisabled}
+          className="py-4 rounded-lg font-semibold text-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-green-600 hover:bg-green-700 active:scale-95 shadow-lg"
+        >
+          <Phone className="w-5 h-5" />
+          {isDialing ? 'Dialing...' : isCallActive ? 'In Progress' : 'Call'}
+        </button>
+
+        <button
+          onClick={onHangup}
+          disabled={!isCallActive}
+          className="py-4 rounded-lg font-semibold text-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-red-600 hover:bg-red-700 active:scale-95 shadow-lg"
+        >
+          <PhoneOff className="w-5 h-5" />
+          End Call
+        </button>
+      </div>
 
       <p className="text-xs text-slate-400 mt-3 text-center">
         Use E.164 format (e.g., +491234567890)
