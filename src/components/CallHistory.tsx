@@ -12,6 +12,7 @@ interface CallHistoryProps {
 export default function CallHistory({ onRedial, isDialing, currentCallId, refreshTrigger }: CallHistoryProps) {
   const [history, setHistory] = useState<CallHistoryRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     loadHistory();
@@ -89,69 +90,79 @@ export default function CallHistory({ onRedial, isDialing, currentCallId, refres
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-4">
-        <h2 className="text-lg font-semibold text-slate-200 mb-3 flex items-center gap-2">
-          <Clock className="w-5 h-5" />
-          Call History
-        </h2>
-        <div className="text-center py-8 text-slate-400 text-sm">
-          Loading...
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-4">
-      <h2 className="text-lg font-semibold text-slate-200 mb-3 flex items-center gap-2">
-        <Clock className="w-5 h-5" />
-        Call History
-      </h2>
+    <div className="bg-slate-800/50 rounded-lg border border-slate-700">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full px-3 py-2 flex items-center justify-between hover:bg-slate-700/50 transition-colors rounded-lg"
+      >
+        <span className="font-semibold text-sm text-slate-300 flex items-center gap-1.5">
+          <Clock className="w-4 h-4" />
+          Call History {!isLoading && history.length > 0 && `(${history.length})`}
+        </span>
+        <span className="text-slate-400 text-xs">
+          {isExpanded ? '▼' : '▶'}
+        </span>
+      </button>
 
-      {history.length === 0 ? (
-        <div className="text-center py-8 text-slate-400 text-sm">
-          No calls yet
+      {!isExpanded && !isLoading && history.length > 0 && (
+        <div className="px-3 pb-2">
+          <div className="text-xs text-slate-300 truncate">
+            Latest: {history[0].contact_name} - {formatTimestamp(history[0].created_at)}
+          </div>
         </div>
-      ) : (
-        <div className="space-y-2 max-h-96 overflow-y-auto">
-          {history.map((record) => (
-            <button
-              key={record.id}
-              onClick={() => handleRedial(record)}
-              disabled={isDialing}
-              className={`w-full text-left p-3 rounded-lg border transition-all ${
-                record.call_id === currentCallId
-                  ? 'bg-blue-900/30 border-blue-500/50'
-                  : 'bg-slate-700/50 border-slate-600 hover:bg-slate-700 hover:border-slate-500'
-              } ${isDialing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer active:scale-98'}`}
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex-shrink-0">
-                  {getStatusIcon(record.status)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-medium text-white truncate">
-                      {record.contact_name}
-                    </p>
-                    <p className="text-xs text-slate-400 flex-shrink-0">
-                      {formatTimestamp(record.created_at)}
-                    </p>
+      )}
+
+      {isExpanded && (
+        <div className="px-3 pb-3">
+          {isLoading ? (
+            <div className="text-center py-4 text-slate-400 text-xs">
+              Loading...
+            </div>
+          ) : history.length === 0 ? (
+            <div className="text-center py-4 text-slate-400 text-xs">
+              No calls yet
+            </div>
+          ) : (
+            <div className="space-y-1.5 max-h-60 overflow-y-auto">
+              {history.map((record) => (
+                <button
+                  key={record.id}
+                  onClick={() => handleRedial(record)}
+                  disabled={isDialing}
+                  className={`w-full text-left p-2 rounded border transition-all ${
+                    record.call_id === currentCallId
+                      ? 'bg-blue-900/30 border-blue-500/50'
+                      : 'bg-slate-700/50 border-slate-600 hover:bg-slate-700 hover:border-slate-500'
+                  } ${isDialing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer active:scale-98'}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="flex-shrink-0">
+                      {getStatusIcon(record.status)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-medium text-white text-xs truncate">
+                          {record.contact_name}
+                        </p>
+                        <p className="text-[10px] text-slate-400 flex-shrink-0">
+                          {formatTimestamp(record.created_at)}
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-between gap-2 mt-0.5">
+                        <p className="text-xs text-slate-300 font-mono truncate">
+                          {record.phone_number}
+                        </p>
+                        <p className={`text-[10px] font-medium flex-shrink-0 capitalize ${getStatusColor(record.status)}`}>
+                          {record.status}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between gap-2 mt-0.5">
-                    <p className="text-sm text-slate-300 font-mono truncate">
-                      {record.phone_number}
-                    </p>
-                    <p className={`text-xs font-medium flex-shrink-0 capitalize ${getStatusColor(record.status)}`}>
-                      {record.status}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </button>
-          ))}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

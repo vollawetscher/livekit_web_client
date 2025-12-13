@@ -299,10 +299,10 @@ export default function VoiceAssistant() {
           </h1>
         </div>
 
-        <div className="mb-4 space-y-2">
+        <div className="mb-3 grid grid-cols-3 gap-2">
           <button
             onClick={handleToggleConnection}
-            className={`w-full py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-all shadow-lg ${
+            className={`py-2 rounded-lg font-semibold text-sm flex items-center justify-center gap-1 transition-all shadow-lg ${
               isConnected
                 ? 'bg-red-600 hover:bg-red-700 active:scale-95'
                 : 'bg-green-600 hover:bg-green-700 active:scale-95'
@@ -310,178 +310,149 @@ export default function VoiceAssistant() {
           >
             {isConnected ? (
               <>
-                <Wifi className="w-5 h-5" />
+                <Wifi className="w-4 h-4" />
                 Disconnect
               </>
             ) : (
               <>
-                <WifiOff className="w-5 h-5" />
+                <WifiOff className="w-4 h-4" />
                 Connect
               </>
             )}
           </button>
 
-          {!isConnected && (
-            <button
-              onClick={() => setEnableVAD(!enableVAD)}
-              className={`w-full py-2 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-all ${
-                enableVAD
-                  ? 'bg-blue-600 hover:bg-blue-700'
-                  : 'bg-slate-600 hover:bg-slate-700'
-              }`}
-            >
-              {enableVAD ? (
-                <>
-                  <MicOff className="w-4 h-4" />
-                  VAD: ON (filters silence)
-                </>
-              ) : (
-                <>
-                  <Mic className="w-4 h-4" />
-                  VAD: OFF (sends all audio)
-                </>
-              )}
-            </button>
-          )}
+          <button
+            onClick={() => setEnableVAD(!enableVAD)}
+            disabled={isConnected}
+            className={`py-2 rounded-lg font-semibold text-sm flex items-center justify-center gap-1 transition-all ${
+              enableVAD
+                ? 'bg-blue-600 hover:bg-blue-700'
+                : 'bg-slate-600 hover:bg-slate-700'
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
+          >
+            {enableVAD ? (
+              <>
+                <MicOff className="w-3 h-3" />
+                VAD: ON
+              </>
+            ) : (
+              <>
+                <Mic className="w-3 h-3" />
+                VAD: OFF
+              </>
+            )}
+          </button>
+
+          <button
+            onClick={() => setIsLogsExpanded(!isLogsExpanded)}
+            className="py-2 rounded-lg font-semibold text-sm flex items-center justify-center gap-1 transition-all bg-slate-700 hover:bg-slate-600"
+          >
+            <Bug className="w-3 h-3" />
+            Logs {isLogsExpanded ? '▼' : '▶'}
+          </button>
         </div>
 
+        {isLogsExpanded && (
+          <div className="mb-3 bg-slate-800/50 rounded-lg border border-slate-700 p-3 max-h-40 overflow-y-auto">
+            {logs.length === 0 ? (
+              <p className="text-slate-500 text-xs italic">No activity yet...</p>
+            ) : (
+              <div className="space-y-1">
+                {logs.map((log, index) => (
+                  <div key={index} className="text-xs font-mono text-slate-300 break-words">
+                    {log}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {isConnected && (
-          <div className="mb-4 space-y-2">
+          <div className="mb-3 space-y-2">
             {isCalibrating && (
               <div className="bg-yellow-900/30 border border-yellow-500/50 rounded-lg p-2 animate-pulse">
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-yellow-400 animate-ping" />
+                  <div className="w-2 h-2 rounded-full bg-yellow-400 animate-ping" />
                   <p className="text-yellow-300 text-xs">Calibrating... remain quiet</p>
                 </div>
               </div>
             )}
 
-            <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-2">
-              <div className="flex items-center gap-2 mb-1">
-                <Mic className="w-3 h-3 text-blue-400" />
-                <span className="text-xs font-medium text-slate-300">Mic</span>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-2">
+                <div className="flex items-center gap-1 mb-1">
+                  <Mic className="w-3 h-3 text-blue-400" />
+                  <span className="text-xs font-medium text-slate-300">Mic</span>
+                </div>
+                <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-75"
+                    style={{ width: `${inputLevel * 100}%` }}
+                  />
+                </div>
               </div>
-              <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-75"
-                  style={{ width: `${inputLevel * 100}%` }}
-                />
+
+              <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-2">
+                <div className="flex items-center gap-1 mb-1">
+                  <div className={`w-2 h-2 rounded-full transition-colors ${isReceivingAudio ? 'bg-green-400' : 'bg-slate-600'}`} />
+                  <span className="text-xs font-medium text-slate-300">Assistant</span>
+                </div>
+                <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-200 ${
+                      isReceivingAudio
+                        ? 'bg-gradient-to-r from-green-500 to-green-400 w-full'
+                        : 'bg-slate-600 w-0'
+                    }`}
+                  />
+                </div>
               </div>
             </div>
-
-            <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-2">
-              <div className="flex items-center gap-2 mb-1">
-                <div className={`w-3 h-3 rounded-full transition-colors ${isReceivingAudio ? 'bg-green-400' : 'bg-slate-600'}`} />
-                <span className="text-xs font-medium text-slate-300">Assistant</span>
-              </div>
-              <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                <div
-                  className={`h-full transition-all duration-200 ${
-                    isReceivingAudio
-                      ? 'bg-gradient-to-r from-green-500 to-green-400 w-full'
-                      : 'bg-slate-600 w-0'
-                  }`}
-                />
-              </div>
-            </div>
-
-            <button
-              onClick={handleDebugStatus}
-              className="w-full py-1.5 rounded-lg font-medium text-xs flex items-center justify-center gap-1 transition-all bg-slate-700 hover:bg-slate-600"
-            >
-              <Bug className="w-3 h-3" />
-              Debug
-            </button>
           </div>
         )}
 
-        {isConnected && (
-          <>
-            {callStatus && (
-              <div className={`mb-4 p-4 rounded-lg border ${
-                callStatus === 'ringing' || callStatus === 'initiated'
-                  ? 'bg-blue-900/30 border-blue-500/50'
-                  : callStatus === 'answered' || callStatus === 'in-progress'
-                  ? 'bg-green-900/30 border-green-500/50'
-                  : callStatus === 'completed'
-                  ? 'bg-slate-800/50 border-slate-500/50'
-                  : 'bg-red-900/30 border-red-500/50'
-              }`}>
-                <p className={`text-sm font-medium capitalize text-center ${
-                  callStatus === 'ringing' || callStatus === 'initiated'
-                    ? 'text-blue-300'
-                    : callStatus === 'answered' || callStatus === 'in-progress'
-                    ? 'text-green-300'
-                    : callStatus === 'completed'
-                    ? 'text-slate-300'
-                    : 'text-red-300'
-                }`}>
-                  {callStatus === 'in-progress' ? 'Call Connected' : callStatus.replace('-', ' ')}
-                </p>
-              </div>
-            )}
-
-            <div className="mb-4">
-              <Dialpad
-                onDial={handleDial}
-                onHangup={handleHangup}
-                isDialing={isDialing}
-                callStatus={callStatus}
-                isCallActive={isCallActive}
-              />
-            </div>
-
-            <div className="mb-8">
-              <CallHistory
-                onRedial={handleDial}
-                isDialing={isDialing || isCallActive}
-                currentCallId={activeCallId || undefined}
-                refreshTrigger={historyRefreshKey}
-              />
-            </div>
-          </>
+        {callStatus && (
+          <div className={`mb-3 p-2 rounded-lg border ${
+            callStatus === 'ringing' || callStatus === 'initiated'
+              ? 'bg-blue-900/30 border-blue-500/50'
+              : callStatus === 'answered' || callStatus === 'in-progress'
+              ? 'bg-green-900/30 border-green-500/50'
+              : callStatus === 'completed'
+              ? 'bg-slate-800/50 border-slate-500/50'
+              : 'bg-red-900/30 border-red-500/50'
+          }`}>
+            <p className={`text-xs font-medium capitalize text-center ${
+              callStatus === 'ringing' || callStatus === 'initiated'
+                ? 'text-blue-300'
+                : callStatus === 'answered' || callStatus === 'in-progress'
+                ? 'text-green-300'
+                : callStatus === 'completed'
+                ? 'text-slate-300'
+                : 'text-red-300'
+            }`}>
+              {callStatus === 'in-progress' ? 'Call Connected' : callStatus.replace('-', ' ')}
+            </p>
+          </div>
         )}
 
-        <div className="bg-slate-800/50 rounded-lg border border-slate-700">
-          <button
-            onClick={() => setIsLogsExpanded(!isLogsExpanded)}
-            className="w-full px-3 py-2 flex items-center justify-between hover:bg-slate-700/50 transition-colors rounded-lg"
-          >
-            <span className="font-semibold text-xs text-slate-300">Activity Log</span>
-            <span className="text-slate-400 text-xs">
-              {isLogsExpanded ? '▼' : '▶'}
-            </span>
-          </button>
-
-          {!isLogsExpanded && logs.length > 0 && (
-            <div className="px-3 pb-2">
-              <div className="text-xs font-mono text-slate-300 truncate">
-                {logs[logs.length - 1]}
-              </div>
-            </div>
-          )}
-
-          {isLogsExpanded && (
-            <div className="px-3 pb-2 max-h-48 overflow-y-auto">
-              {logs.length === 0 ? (
-                <p className="text-slate-500 text-xs italic">
-                  No activity yet...
-                </p>
-              ) : (
-                <div className="space-y-1">
-                  {logs.map((log, index) => (
-                    <div
-                      key={index}
-                      className="text-xs font-mono text-slate-300 break-words"
-                    >
-                      {log}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+        <div className="mb-3">
+          <Dialpad
+            onDial={handleDial}
+            onHangup={handleHangup}
+            isDialing={isDialing}
+            callStatus={callStatus}
+            isCallActive={isCallActive}
+            isConnected={isConnected}
+          />
         </div>
+
+        <CallHistory
+          onRedial={handleDial}
+          isDialing={isDialing || isCallActive}
+          currentCallId={activeCallId || undefined}
+          refreshTrigger={historyRefreshKey}
+        />
       </div>
     </div>
   );

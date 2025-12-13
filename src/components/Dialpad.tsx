@@ -7,13 +7,14 @@ interface DialpadProps {
   isDialing: boolean;
   callStatus: string | null;
   isCallActive: boolean;
+  isConnected: boolean;
 }
 
-export default function Dialpad({ onDial, onHangup, isDialing, callStatus, isCallActive }: DialpadProps) {
+export default function Dialpad({ onDial, onHangup, isDialing, callStatus, isCallActive, isConnected }: DialpadProps) {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [contactName, setContactName] = useState('');
 
-  const isDisabled = isDialing || isCallActive;
+  const isDisabled = !isConnected || isDialing || isCallActive;
 
   const handleNumberClick = (digit: string) => {
     if (!isDisabled) {
@@ -55,37 +56,31 @@ export default function Dialpad({ onDial, onHangup, isDialing, callStatus, isCal
   ];
 
   return (
-    <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-6">
-      <div className="mb-6">
-        <h2 className="text-lg font-semibold text-slate-200 mb-4 flex items-center gap-2">
-          <Phone className="w-5 h-5" />
+    <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-3">
+      <div className="mb-3">
+        <h2 className="text-sm font-semibold text-slate-200 mb-2 flex items-center gap-1.5">
+          <Phone className="w-4 h-4" />
           Dialpad
         </h2>
 
-        {callStatus && (
-          <div className="mb-4 p-3 bg-blue-900/30 border border-blue-500/50 rounded-lg">
-            <p className="text-sm text-blue-300 font-medium">{callStatus}</p>
-          </div>
-        )}
-
-        <div className="mb-3">
-          <label className="block text-xs font-medium text-slate-400 mb-1.5">
+        <div className="mb-2">
+          <label className="block text-xs font-medium text-slate-400 mb-1">
             <User className="w-3 h-3 inline mr-1" />
-            Contact Name (Optional)
+            Contact Name
           </label>
           <input
             type="text"
             value={contactName}
             onChange={(e) => setContactName(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Enter name"
+            placeholder="Optional"
             disabled={isDisabled}
-            className="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm placeholder-slate-400"
+            className="w-full px-2 py-1.5 rounded text-xs bg-slate-700 border border-slate-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed text-white placeholder-slate-400"
           />
         </div>
 
-        <div className="mb-4">
-          <label className="block text-xs font-medium text-slate-400 mb-1.5">
+        <div className="mb-2">
+          <label className="block text-xs font-medium text-slate-400 mb-1">
             Phone Number
           </label>
           <div className="relative">
@@ -96,60 +91,60 @@ export default function Dialpad({ onDial, onHangup, isDialing, callStatus, isCal
               onKeyPress={handleKeyPress}
               placeholder="+1234567890"
               disabled={isDisabled}
-              className="w-full px-3 py-3 pr-12 rounded-lg bg-slate-700 border border-slate-600 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed text-white text-lg font-mono tracking-wider text-center placeholder-slate-400"
+              className="w-full px-2 py-2 pr-10 rounded text-sm bg-slate-700 border border-slate-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed text-white font-mono tracking-wider text-center placeholder-slate-400"
             />
             {phoneNumber && (
               <button
                 onClick={handleDelete}
                 disabled={isDisabled}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 hover:bg-slate-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-600 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Delete className="w-4 h-4 text-slate-400" />
+                <Delete className="w-3 h-3 text-slate-400" />
               </button>
             )}
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3 mb-4">
+      <div className="grid grid-cols-3 gap-2 mb-3">
         {dialpadButtons.map((button) => (
           <button
             key={button.value}
             onClick={() => handleNumberClick(button.value)}
             disabled={isDisabled}
-            className="aspect-square rounded-lg bg-slate-700 hover:bg-slate-600 active:bg-slate-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-slate-600 hover:border-slate-500"
+            className="aspect-square rounded bg-slate-700 hover:bg-slate-600 active:bg-slate-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-slate-600 hover:border-slate-500"
           >
             <div className="flex flex-col items-center justify-center">
-              <span className="text-2xl font-semibold text-white">{button.display}</span>
+              <span className="text-xl font-semibold text-white">{button.display}</span>
               {button.sub && (
-                <span className="text-xs text-slate-400 mt-0.5">{button.sub}</span>
+                <span className="text-[9px] text-slate-400 mt-0.5">{button.sub}</span>
               )}
             </div>
           </button>
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2">
         <button
           onClick={handleDial}
           disabled={!phoneNumber || isDisabled}
-          className="py-4 rounded-lg font-semibold text-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-green-600 hover:bg-green-700 active:scale-95 shadow-lg"
+          className="py-2.5 rounded-lg font-semibold text-sm flex items-center justify-center gap-1.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-green-600 hover:bg-green-700 active:scale-95 shadow-lg"
         >
-          <Phone className="w-5 h-5" />
-          {isDialing ? 'Dialing...' : isCallActive ? 'In Progress' : 'Call'}
+          <Phone className="w-4 h-4" />
+          {isDialing ? 'Dialing...' : isCallActive ? 'Active' : 'Call'}
         </button>
 
         <button
           onClick={onHangup}
           disabled={!isCallActive}
-          className="py-4 rounded-lg font-semibold text-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-red-600 hover:bg-red-700 active:scale-95 shadow-lg"
+          className="py-2.5 rounded-lg font-semibold text-sm flex items-center justify-center gap-1.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-red-600 hover:bg-red-700 active:scale-95 shadow-lg"
         >
-          <PhoneOff className="w-5 h-5" />
+          <PhoneOff className="w-4 h-4" />
           End Call
         </button>
       </div>
 
-      <p className="text-xs text-slate-400 mt-3 text-center">
+      <p className="text-[10px] text-slate-400 mt-2 text-center">
         Use E.164 format (e.g., +491234567890)
       </p>
     </div>
