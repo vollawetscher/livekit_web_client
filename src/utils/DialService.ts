@@ -35,4 +35,22 @@ export class DialService {
 
     return await response.json();
   }
+
+  async hangupCall(callId: string): Promise<{ success: boolean; message: string }> {
+    const response = await fetch(`${this.baseUrl}/api/mobile/call/hangup`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.jwtToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ callId }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Hangup failed: ${response.status} ${errorText}`);
+    }
+
+    return await response.json();
+  }
 }
