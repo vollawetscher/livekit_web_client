@@ -15,7 +15,12 @@ export class AudioRecorder {
   private calibrationStartTime = 0;
   private calibrationDuration = 2000; // 2 seconds
   private noiseThreshold = 0;
-  private thresholdMultiplier = 1.5; // Threshold is 1.5x the background noise
+  private thresholdMultiplier = 2.5; // Threshold is 2.5x the background noise
+
+  // Adaptive gain control for level display
+  private recentPeaks: number[] = [];
+  private maxPeakHistory = 50; // Track last 50 peaks
+  private adaptiveGain = 5.0; // Start with moderate gain
 
   constructor(
     onAudioData: (data: ArrayBuffer) => void,
@@ -109,7 +114,25 @@ export class AudioRecorder {
         sum += inputData[i] * inputData[i];
       }
       const rms = Math.sqrt(sum / inputData.length);
-      const level = Math.min(1, rms * 10); // Amplify for visibility
+
+      // Adaptive gain control: track recent peaks and adjust gain
+      if (!this.isCalibrating && this.enableVAD) {
+        if (rms > this.noiseThreshold) {
+          this.recentPeaks.push(rms);
+          if (this.recentPeaks.length > this.maxPeakHistory) {
+            this.recentPeaks.shift();
+          }
+
+          // Calculate average peak for adaptive gain
+          const avgPeak = this.recentPeaks.reduce((a, b) => a + b, 0) / this.recentPeaks.length;
+          // Adjust gain so average speech peaks hit around 0.7-0.8
+          if (avgPeak > 0) {
+            this.adaptiveGain = Math.min(10, Math.max(3, 0.75 / avgPeak));
+          }
+        }
+      }
+
+      const level = Math.min(1, rms * this.adaptiveGain);
 
       // Handle calibration phase
       if (this.isCalibrating) {
@@ -129,6 +152,7 @@ export class AudioRecorder {
           console.log(`✅ [AudioRecorder] Calibration complete!`);
           console.log(`   Average noise: ${avgNoise.toFixed(4)}`);
           console.log(`   Threshold set to: ${this.noiseThreshold.toFixed(4)} (${this.thresholdMultiplier}x noise)`);
+          console.log(`   Starting adaptive gain at: ${this.adaptiveGain.toFixed(1)}x`);
 
           this.isCalibrating = false;
 
@@ -152,9 +176,9 @@ export class AudioRecorder {
       const now = Date.now();
       if (now - this.lastLogTime > 5000) {
         if (this.enableVAD) {
-          console.log(`🎤 [AudioRecorder] chunk ${this.chunkCount}, level: ${level.toFixed(3)}, RMS: ${rms.toFixed(4)}, threshold: ${this.noiseThreshold.toFixed(4)}, sending: ${shouldSendAudio}`);
+          console.log(`🎤 [AudioRecorder] chunk ${this.chunkCount}, level: ${level.toFixed(3)}, RMS: ${rms.toFixed(4)}, gain: ${this.adaptiveGain.toFixed(1)}x, threshold: ${this.noiseThreshold.toFixed(4)}, sending: ${shouldSendAudio}`);
         } else {
-          console.log(`🎤 [AudioRecorder] chunk ${this.chunkCount}, level: ${level.toFixed(3)}, RMS: ${rms.toFixed(4)}, VAD disabled - always sending`);
+          console.log(`🎤 [AudioRecorder] chunk ${this.chunkCount}, level: ${level.toFixed(3)}, RMS: ${rms.toFixed(4)}, gain: ${this.adaptiveGain.toFixed(1)}x, VAD disabled - always sending`);
         }
         this.lastLogTime = now;
       }

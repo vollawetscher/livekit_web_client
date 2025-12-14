@@ -137,7 +137,7 @@ export class WebSocketClient {
             clearTimeout(connectionTimeout);
             reject(new Error(data.message || 'Server reported an error'));
           } else if (data.event === 'audio') {
-            console.log(`🔊 [WebSocketClient] Received audio chunk (${data.audio?.length} bytes)`);
+            // Don't log to UI for every audio chunk - too noisy
             this.playAudio(data.audio);
           } else if (data.event === 'transcript') {
             console.log('📝 Transcript:', data.text);
@@ -294,7 +294,10 @@ export class WebSocketClient {
 
     this.scheduledSources.push(source);
 
-    console.log(`🎵 Audio scheduled at ${startTime.toFixed(3)}s, duration: ${audioBuffer.duration.toFixed(3)}s, next: ${this.nextPlayTime.toFixed(3)}s`);
+    // Only log occasionally to reduce clutter
+    if (this.scheduledSources.length === 1 || this.scheduledSources.length % 10 === 0) {
+      console.log(`🎵 Audio scheduled at ${startTime.toFixed(3)}s, duration: ${audioBuffer.duration.toFixed(3)}s, queue: ${this.scheduledSources.length}`);
+    }
   }
 
   clearAudioQueue(): void {
