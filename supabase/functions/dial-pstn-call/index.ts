@@ -89,25 +89,33 @@ Deno.serve(async (req: Request) => {
     const callId = `call-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 
     // Create SIP participant to dial out
-    const sipParticipant = await sipClient.createSipParticipant(
-      sipTrunkId,
-      phoneNumber,
-      sessionId,
-      {
-        participantIdentity: `sip-${callId}`,
-        participantName: contactName,
-        participantMetadata: JSON.stringify({
-          callId,
-          phoneNumber,
-          contactName,
-          direction: 'outbound',
-          initiatedAt: new Date().toISOString(),
-        }),
-        playDialtone: true,
-      }
-    );
+    console.log(`Attempting to create SIP participant with trunk: ${sipTrunkId}, phone: ${phoneNumber}, room: ${sessionId}`);
 
-    console.log(`SIP participant created:`, sipParticipant);
+    let sipParticipant;
+    try {
+      sipParticipant = await sipClient.createSipParticipant(
+        sipTrunkId,
+        phoneNumber,
+        sessionId,
+        {
+          participantIdentity: `sip-${callId}`,
+          participantName: contactName,
+          participantMetadata: JSON.stringify({
+            callId,
+            phoneNumber,
+            contactName,
+            direction: 'outbound',
+            initiatedAt: new Date().toISOString(),
+          }),
+          playDialtone: true,
+        }
+      );
+    } catch (error) {
+      console.error(`LiveKit SIP participant creation failed:`, error);
+      throw new Error(`Failed to create SIP participant: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+
+    console.log(`SIP participant created successfully:`, JSON.stringify(sipParticipant, null, 2));
 
     const response: DialResponse = {
       callId,
