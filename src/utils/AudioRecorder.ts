@@ -1,21 +1,10 @@
 export class AudioRecorder {
-  private onAudioData: (data: ArrayBuffer) => void;
   private onAudioLevel?: (level: number) => void;
-  private onCalibrationComplete?: (threshold: number) => void;
   private audioContext: AudioContext | null = null;
   private mediaStream: MediaStream | null = null;
   private processor: ScriptProcessorNode | null = null;
   private chunkCount = 0;
   private lastLogTime = 0;
-
-  // Voice Activity Detection (VAD) properties
-  private enableVAD: boolean;
-  private isCalibrating = true;
-  private calibrationSamples: number[] = [];
-  private calibrationStartTime = 0;
-  private calibrationDuration = 2000; // 2 seconds
-  private noiseThreshold = 0;
-  private thresholdMultiplier = 2.5; // Threshold is 2.5x the background noise
 
   // Adaptive gain control for level display
   private recentPeaks: number[] = [];
@@ -23,15 +12,9 @@ export class AudioRecorder {
   private adaptiveGain = 5.0; // Start with moderate gain
 
   constructor(
-    onAudioData: (data: ArrayBuffer) => void,
-    onAudioLevel?: (level: number) => void,
-    onCalibrationComplete?: (threshold: number) => void,
-    enableVAD: boolean = true
+    onAudioLevel?: (level: number) => void
   ) {
-    this.onAudioData = onAudioData;
     this.onAudioLevel = onAudioLevel;
-    this.onCalibrationComplete = onCalibrationComplete;
-    this.enableVAD = enableVAD;
   }
 
   async start(): Promise<void> {
@@ -66,39 +49,8 @@ export class AudioRecorder {
     console.log('🎤 [AudioRecorder] Microphone track settings:', settings);
     console.log('🎤 [AudioRecorder] Track enabled:', audioTrack.enabled, 'readyState:', audioTrack.readyState);
 
-    // Monitor track state changes
-    audioTrack.addEventListener('mute', () => {
-      console.warn('⚠️ [AudioRecorder] Audio track MUTED!');
-    });
-    audioTrack.addEventListener('unmute', () => {
-      console.log('✅ [AudioRecorder] Audio track UNMUTED');
-    });
-    audioTrack.addEventListener('ended', () => {
-      console.error('❌ [AudioRecorder] Audio track ENDED!');
-    });
-
     this.audioContext = new AudioContext({ sampleRate: 16000 });
     console.log('🎤 [AudioRecorder] AudioContext created, state:', this.audioContext.state);
-
-    // Monitor AudioContext state changes
-    this.audioContext.addEventListener('statechange', () => {
-      console.log(`🎤 [AudioRecorder] AudioContext state changed to: ${this.audioContext?.state}`);
-    });
-
-    // Start calibration immediately (only if VAD is enabled)
-    if (this.enableVAD) {
-      this.isCalibrating = true;
-      this.calibrationSamples = [];
-      this.calibrationStartTime = Date.now();
-      console.log('🎯 [AudioRecorder] VAD enabled - Starting noise calibration (please remain quiet for 2 seconds)...');
-    } else {
-      this.isCalibrating = false;
-      console.log('🔇 [AudioRecorder] VAD disabled - Sending all audio continuously');
-      // Immediately notify that calibration is "complete" (skipped)
-      if (this.onCalibrationComplete) {
-        this.onCalibrationComplete(0);
-      }
-    }
 
     const source = this.audioContext.createMediaStreamSource(this.mediaStream);
 
@@ -115,94 +67,36 @@ export class AudioRecorder {
       }
       const rms = Math.sqrt(sum / inputData.length);
 
-      // Adaptive gain control: track recent peaks and adjust gain
-      if (!this.isCalibrating && this.enableVAD) {
-        if (rms > this.noiseThreshold) {
-          this.recentPeaks.push(rms);
-          if (this.recentPeaks.length > this.maxPeakHistory) {
-            this.recentPeaks.shift();
-          }
+      // Track recent peaks for adaptive gain
+      this.recentPeaks.push(rms);
+      if (this.recentPeaks.length > this.maxPeakHistory) {
+        this.recentPeaks.shift();
+      }
 
-          // Calculate average peak for adaptive gain
-          const avgPeak = this.recentPeaks.reduce((a, b) => a + b, 0) / this.recentPeaks.length;
-          // Adjust gain so average speech peaks hit around 0.7-0.8
-          if (avgPeak > 0) {
-            this.adaptiveGain = Math.min(10, Math.max(3, 0.75 / avgPeak));
-          }
-        }
+      // Calculate average peak for adaptive gain
+      const avgPeak = this.recentPeaks.reduce((a, b) => a + b, 0) / this.recentPeaks.length;
+      if (avgPeak > 0) {
+        this.adaptiveGain = Math.min(10, Math.max(3, 0.75 / avgPeak));
       }
 
       const level = Math.min(1, rms * this.adaptiveGain);
 
-      // Handle calibration phase
-      if (this.isCalibrating) {
-        const elapsed = Date.now() - this.calibrationStartTime;
-
-        // Collect samples during calibration
-        this.calibrationSamples.push(rms);
-
-        // Check if calibration is complete
-        if (elapsed >= this.calibrationDuration) {
-          // Calculate average noise level
-          const avgNoise = this.calibrationSamples.reduce((a, b) => a + b, 0) / this.calibrationSamples.length;
-
-          // Set threshold as multiple of average noise
-          this.noiseThreshold = avgNoise * this.thresholdMultiplier;
-
-          console.log(`✅ [AudioRecorder] Calibration complete!`);
-          console.log(`   Average noise: ${avgNoise.toFixed(4)}`);
-          console.log(`   Threshold set to: ${this.noiseThreshold.toFixed(4)} (${this.thresholdMultiplier}x noise)`);
-          console.log(`   Starting adaptive gain at: ${this.adaptiveGain.toFixed(1)}x`);
-
-          this.isCalibrating = false;
-
-          // Notify UI that calibration is complete
-          if (this.onCalibrationComplete) {
-            this.onCalibrationComplete(this.noiseThreshold);
-          }
-        }
-
-        // Don't send audio during calibration
-        if (this.onAudioLevel) {
-          this.onAudioLevel(level);
-        }
-        return;
-      }
-
-      // Voice Activity Detection: Only send audio if level exceeds threshold (when VAD enabled)
-      const shouldSendAudio = !this.enableVAD || rms > this.noiseThreshold;
-
       // Log every 5 seconds
       const now = Date.now();
       if (now - this.lastLogTime > 5000) {
-        if (this.enableVAD) {
-          console.log(`🎤 [AudioRecorder] chunk ${this.chunkCount}, level: ${level.toFixed(3)}, RMS: ${rms.toFixed(4)}, gain: ${this.adaptiveGain.toFixed(1)}x, threshold: ${this.noiseThreshold.toFixed(4)}, sending: ${shouldSendAudio}`);
-        } else {
-          console.log(`🎤 [AudioRecorder] chunk ${this.chunkCount}, level: ${level.toFixed(3)}, RMS: ${rms.toFixed(4)}, gain: ${this.adaptiveGain.toFixed(1)}x, VAD disabled - always sending`);
-        }
+        console.log(`🎤 [AudioRecorder] chunk ${this.chunkCount}, level: ${level.toFixed(3)}, RMS: ${rms.toFixed(4)}, gain: ${this.adaptiveGain.toFixed(1)}x`);
         this.lastLogTime = now;
       }
 
       if (this.onAudioLevel) {
         this.onAudioLevel(level);
       }
-
-      // Send audio if VAD is disabled or if it exceeds the threshold (voice detected)
-      if (shouldSendAudio) {
-        const pcm16 = new Int16Array(inputData.length);
-        for (let i = 0; i < inputData.length; i++) {
-          const s = Math.max(-1, Math.min(1, inputData[i]));
-          pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
-        }
-
-        this.onAudioData(pcm16.buffer);
-      }
     };
 
     source.connect(this.processor);
     this.processor.connect(this.audioContext.destination);
 
-    console.log('🎤 Audio recording started with processor connected to destination');
+    console.log('🎤 Audio recording started - LiveKit handles VAD');
   }
 
   stop(): void {

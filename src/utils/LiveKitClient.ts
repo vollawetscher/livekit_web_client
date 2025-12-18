@@ -18,6 +18,7 @@ export interface CallStatusEvent {
   callId: string;
   phoneNumber: string;
   timestamp: number;
+  sipParticipantId?: string;
 }
 
 export class LiveKitClient {
@@ -128,6 +129,50 @@ export class LiveKitClient {
     this.room.on(RoomEvent.ConnectionQualityChanged, (quality: any, participant: any) => {
       console.log('📶 Connection quality:', quality, participant?.identity);
     });
+
+    this.room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
+      console.log('👤 Participant connected:', participant.identity);
+
+      if (participant.identity.startsWith('sip-')) {
+        this.onLogMessage(`SIP participant connected: ${participant.identity}`);
+
+        const metadata = participant.metadata ? JSON.parse(participant.metadata) : {};
+        if (metadata.callId && metadata.phoneNumber) {
+          if (this.onCallStatus) {
+            this.onCallStatus({
+              event: 'call-status',
+              status: 'answered',
+              callId: metadata.callId,
+              phoneNumber: metadata.phoneNumber,
+              timestamp: Date.now(),
+              sipParticipantId: participant.identity,
+            });
+          }
+        }
+      }
+    });
+
+    this.room.on(RoomEvent.ParticipantDisconnected, (participant: RemoteParticipant) => {
+      console.log('👤 Participant disconnected:', participant.identity);
+
+      if (participant.identity.startsWith('sip-')) {
+        this.onLogMessage(`SIP participant disconnected: ${participant.identity}`);
+
+        const metadata = participant.metadata ? JSON.parse(participant.metadata) : {};
+        if (metadata.callId && metadata.phoneNumber) {
+          if (this.onCallStatus) {
+            this.onCallStatus({
+              event: 'call-status',
+              status: 'completed',
+              callId: metadata.callId,
+              phoneNumber: metadata.phoneNumber,
+              timestamp: Date.now(),
+              sipParticipantId: participant.identity,
+            });
+          }
+        }
+      }
+    });
   }
 
   async connect(url: string, token: string): Promise<void> {
@@ -237,6 +282,10 @@ export class LiveKitClient {
 
   getConnectionState(): string {
     return this.room.state;
+  }
+
+  getRoom(): Room {
+    return this.room;
   }
 
   logStatus(): void {

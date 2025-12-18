@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, Wifi, WifiOff, Bug } from 'lucide-react';
+import { Mic, Wifi, WifiOff, Bug } from 'lucide-react';
 import { AudioRecorder } from '../utils/AudioRecorder';
 import { LiveKitClient, CallStatusEvent } from '../utils/LiveKitClient';
 import { DialService } from '../utils/DialService';
@@ -21,13 +21,13 @@ export default function VoiceAssistant() {
   const [activeCallId, setActiveCallId] = useState<string | null>(null);
   const [isCallActive, setIsCallActive] = useState(false);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
-  const [isCalibrating, setIsCalibrating] = useState(false);
-  const [enableVAD, setEnableVAD] = useState(import.meta.env.VITE_ENABLE_VAD !== 'false');
+  const [activeSipParticipantId, setActiveSipParticipantId] = useState<string | null>(null);
   const recorderRef = useRef<AudioRecorder | null>(null);
   const liveKitClientRef = useRef<LiveKitClient | null>(null);
   const audioTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const tokenManagerRef = useRef<TokenManager | null>(null);
   const currentCallDataRef = useRef<{ phoneNumber: string; contactName: string } | null>(null);
+  const ringingAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const addLog = (message: string) => {
     const timestamp = new Date().toLocaleTimeString();
@@ -39,15 +39,36 @@ export default function VoiceAssistant() {
     setCallStatus(event.status);
     setActiveCallId(event.callId);
 
+    if (event.sipParticipantId) {
+      setActiveSipParticipantId(event.sipParticipantId);
+    }
+
+    if (event.status === 'ringing') {
+      if (ringingAudioRef.current) {
+        ringingAudioRef.current.play().catch(err => console.error('Failed to play ringing sound:', err));
+      }
+    } else {
+      if (ringingAudioRef.current) {
+        ringingAudioRef.current.pause();
+        ringingAudioRef.current.currentTime = 0;
+      }
+    }
+
     const isActive = ['initiated', 'ringing', 'in-progress', 'answered'].includes(event.status);
     setIsCallActive(isActive);
 
     const isTerminal = ['completed', 'failed', 'busy', 'no-answer'].includes(event.status);
     if (isTerminal) {
+      if (ringingAudioRef.current) {
+        ringingAudioRef.current.pause();
+        ringingAudioRef.current.currentTime = 0;
+      }
+
       setTimeout(() => {
         setCallStatus(null);
         setActiveCallId(null);
         setIsCallActive(false);
+        setActiveSipParticipantId(null);
         currentCallDataRef.current = null;
       }, 3000);
     }
@@ -70,6 +91,16 @@ export default function VoiceAssistant() {
       tokenManagerRef.current = new TokenManager('web-user');
       addLog('Token manager initialized');
     }
+
+    ringingAudioRef.current = new Audio('https://www.soundjay.com/phone/sounds/phone-calling-1.mp3');
+    ringingAudioRef.current.loop = true;
+
+    return () => {
+      if (ringingAudioRef.current) {
+        ringingAudioRef.current.pause();
+        ringingAudioRef.current = null;
+      }
+    };
   }, []);
 
   const handleStart = async () => {
@@ -89,35 +120,13 @@ export default function VoiceAssistant() {
       setJwtToken(token);
       addLog('LiveKit token acquired successfully');
 
-      if (enableVAD) {
-        setIsCalibrating(true);
-        addLog('Calibrating microphone - please remain quiet for 2 seconds...');
-      } else {
-        addLog('VAD disabled - monitoring audio levels only');
-      }
-
-      let calibrationResolve: () => void;
-      const calibrationPromise = new Promise<void>((resolve) => {
-        calibrationResolve = resolve;
-      });
-
       recorderRef.current = new AudioRecorder(
-        () => {},
         (level) => {
           setInputLevel(level);
-        },
-        (threshold) => {
-          setIsCalibrating(false);
-          if (threshold > 0) {
-            addLog(`Calibration complete! Noise threshold: ${threshold.toFixed(4)}`);
-          }
-          calibrationResolve();
-        },
-        enableVAD
+        }
       );
 
       await recorderRef.current.start();
-      await calibrationPromise;
 
       addLog('Connecting to LiveKit room...');
 
@@ -165,10 +174,14 @@ export default function VoiceAssistant() {
       audioTimeoutRef.current = null;
     }
 
+    if (ringingAudioRef.current) {
+      ringingAudioRef.current.pause();
+      ringingAudioRef.current.currentTime = 0;
+    }
+
     setIsConnected(false);
     setInputLevel(0);
     setIsReceivingAudio(false);
-    setIsCalibrating(false);
     addLog('Disconnected');
   };
 
@@ -207,8 +220,21 @@ export default function VoiceAssistant() {
 
       setCallStatus('initiated');
       setActiveCallId(result.callId);
+      setActiveSipParticipantId(result.sipParticipantId);
       addLog(`Call initiated: ${result.callId}`);
-      addLog(`Twilio SID: ${result.twilioCallSid}`);
+      addLog(`SIP Participant: ${result.sipParticipantId}`);
+
+      setTimeout(() => {
+        if (liveKitClientRef.current) {
+          const participants = Array.from(liveKitClientRef.current.getRoom().remoteParticipants.values());
+          const sipConnected = participants.some(p => p.identity === result.sipParticipantId);
+
+          if (!sipConnected) {
+            setCallStatus('ringing');
+            addLog('Call is ringing...');
+          }
+        }
+      }, 2000);
 
       await insertCallHistory({
         phone_number: phoneNumber,
@@ -244,15 +270,38 @@ export default function VoiceAssistant() {
     }
   };
 
-  const handleHangup = () => {
-    if (!liveKitClientRef.current || !isCallActive) {
+  const handleHangup = async () => {
+    if (!liveKitClientRef.current || !isCallActive || !activeSipParticipantId) {
       return;
     }
 
     try {
-      addLog('Sending stop event to end call...');
-      liveKitClientRef.current.sendStop();
-      addLog('Stop event sent');
+      addLog('Ending call...');
+
+      if (ringingAudioRef.current) {
+        ringingAudioRef.current.pause();
+        ringingAudioRef.current.currentTime = 0;
+      }
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      if (!supabaseUrl || !supabaseKey) {
+        throw new Error('Supabase configuration not found');
+      }
+
+      const dialService = new DialService(supabaseUrl, supabaseKey);
+      await dialService.hangupCall(activeSipParticipantId);
+
+      addLog('Call ended successfully');
+      setCallStatus('completed');
+      setIsCallActive(false);
+
+      setTimeout(() => {
+        setCallStatus(null);
+        setActiveCallId(null);
+        setActiveSipParticipantId(null);
+        currentCallDataRef.current = null;
+      }, 2000);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       addLog(`Hangup error: ${errorMessage}`);
@@ -269,7 +318,7 @@ export default function VoiceAssistant() {
           </h1>
         </div>
 
-        <div className="mb-3 grid grid-cols-3 gap-2">
+        <div className="mb-3 grid grid-cols-2 gap-2">
           <button
             onClick={handleToggleConnection}
             className={`py-2 rounded-lg font-semibold text-sm flex items-center justify-center gap-1 transition-all shadow-lg ${
@@ -287,28 +336,6 @@ export default function VoiceAssistant() {
               <>
                 <WifiOff className="w-4 h-4" />
                 Connect
-              </>
-            )}
-          </button>
-
-          <button
-            onClick={() => setEnableVAD(!enableVAD)}
-            disabled={isConnected}
-            className={`py-2 rounded-lg font-semibold text-sm flex items-center justify-center gap-1 transition-all ${
-              enableVAD
-                ? 'bg-blue-600 hover:bg-blue-700'
-                : 'bg-slate-600 hover:bg-slate-700'
-            } disabled:opacity-50 disabled:cursor-not-allowed`}
-          >
-            {enableVAD ? (
-              <>
-                <MicOff className="w-3 h-3" />
-                Filter Silence
-              </>
-            ) : (
-              <>
-                <Mic className="w-3 h-3" />
-                All Audio
               </>
             )}
           </button>
@@ -339,16 +366,7 @@ export default function VoiceAssistant() {
         )}
 
         {isConnected && (
-          <div className="mb-3 space-y-2">
-            {isCalibrating && (
-              <div className="bg-yellow-900/30 border border-yellow-500/50 rounded-lg p-2 animate-pulse">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-yellow-400 animate-ping" />
-                  <p className="text-yellow-300 text-xs">Calibrating... remain quiet</p>
-                </div>
-              </div>
-            )}
-
+          <div className="mb-3">
             <div className="grid grid-cols-2 gap-2">
               <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-2">
                 <div className="flex items-center gap-1 mb-1">

@@ -1,7 +1,7 @@
 interface DialResponse {
   callId: string;
   status: string;
-  twilioCallSid: string;
+  sipParticipantId: string;
   message: string;
 }
 
@@ -36,14 +36,14 @@ export class DialService {
     return await response.json();
   }
 
-  async hangupCall(callId: string): Promise<{ success: boolean; message: string }> {
-    const response = await fetch(`${this.baseUrl}/api/mobile/call/hangup`, {
+  async hangupCall(sipParticipantId: string): Promise<{ success: boolean; message: string }> {
+    const response = await fetch(`${this.baseUrl}/functions/v1/hangup-sip-call`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${this.jwtToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ callId }),
+      body: JSON.stringify({ sipParticipantId }),
     });
 
     if (!response.ok) {

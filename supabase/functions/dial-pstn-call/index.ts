@@ -16,7 +16,7 @@ interface DialRequest {
 interface DialResponse {
   callId: string;
   status: string;
-  twilioCallSid: string;
+  sipParticipantId: string;
   message: string;
 }
 
@@ -120,7 +120,7 @@ Deno.serve(async (req: Request) => {
     const response: DialResponse = {
       callId,
       status: "initiated",
-      twilioCallSid: sipParticipant.sipCallId || "pending",
+      sipParticipantId: `sip-${callId}`,
       message: `Call initiated to ${phoneNumber}`,
     };
 
