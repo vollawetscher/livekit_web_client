@@ -145,10 +145,11 @@ Deno.serve(async (req: Request) => {
       }
 
       // Generate TwiML to connect to LiveKit via SIP
+      // Note: Only pass the room parameter as Twilio restricts which SIP headers are allowed
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Dial>
-    <Sip>${livekitSipUri}?room=${encodeURIComponent(roomName)}&amp;name=${encodeURIComponent(participantName || 'Guest')}</Sip>
+    <Sip>${livekitSipUri}?room=${encodeURIComponent(roomName)}</Sip>
   </Dial>
 </Response>`;
 
