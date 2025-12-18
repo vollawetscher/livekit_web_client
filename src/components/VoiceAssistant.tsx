@@ -22,7 +22,6 @@ export default function VoiceAssistant() {
   const [isCallActive, setIsCallActive] = useState(false);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const [isCalibrating, setIsCalibrating] = useState(false);
-  const [noiseThreshold, setNoiseThreshold] = useState<number | null>(null);
   const [enableVAD, setEnableVAD] = useState(import.meta.env.VITE_ENABLE_VAD !== 'false');
   const recorderRef = useRef<AudioRecorder | null>(null);
   const liveKitClientRef = useRef<LiveKitClient | null>(null);
@@ -68,7 +67,7 @@ export default function VoiceAssistant() {
       setLiveKitUrl(envUrl);
       addLog('Loaded LiveKit URL from environment');
 
-      tokenManagerRef.current = new TokenManager('', 'web-user');
+      tokenManagerRef.current = new TokenManager('web-user');
       addLog('Token manager initialized');
     }
   }, []);
@@ -109,7 +108,6 @@ export default function VoiceAssistant() {
         },
         (threshold) => {
           setIsCalibrating(false);
-          setNoiseThreshold(threshold);
           if (threshold > 0) {
             addLog(`Calibration complete! Noise threshold: ${threshold.toFixed(4)}`);
           }
@@ -171,7 +169,6 @@ export default function VoiceAssistant() {
     setInputLevel(0);
     setIsReceivingAudio(false);
     setIsCalibrating(false);
-    setNoiseThreshold(null);
     addLog('Disconnected');
   };
 
@@ -181,22 +178,6 @@ export default function VoiceAssistant() {
     } else {
       handleStart();
     }
-  };
-
-  const handleDebugStatus = () => {
-    console.log('🔍 ===== DEBUG STATUS DUMP =====');
-    if (liveKitClientRef.current) {
-      liveKitClientRef.current.logStatus();
-    } else {
-      console.log('❌ LiveKitClient: Not initialized');
-    }
-    if (recorderRef.current) {
-      console.log('✅ AudioRecorder: Initialized');
-    } else {
-      console.log('❌ AudioRecorder: Not initialized');
-    }
-    console.log('🔍 ===========================');
-    addLog('Debug status logged to console');
   };
 
   const handleDial = async (phoneNumber: string, contactName: string) => {

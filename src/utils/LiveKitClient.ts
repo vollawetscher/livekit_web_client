@@ -3,10 +3,13 @@ import {
   RoomEvent,
   RemoteTrackPublication,
   RemoteAudioTrack,
+  RemoteTrack,
   Track,
   LocalAudioTrack,
   createLocalAudioTrack,
   AudioCaptureOptions,
+  DisconnectReason,
+  RemoteParticipant,
 } from 'livekit-client';
 
 export interface CallStatusEvent {
@@ -46,7 +49,7 @@ export class LiveKitClient {
       this.isConnected = true;
     });
 
-    this.room.on(RoomEvent.Disconnected, (reason?: string) => {
+    this.room.on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
       console.log('🔌 Disconnected from LiveKit room:', reason);
       this.onLogMessage(`Disconnected: ${reason || 'Unknown reason'}`);
       this.isConnected = false;
@@ -63,14 +66,15 @@ export class LiveKitClient {
     });
 
     this.room.on(RoomEvent.TrackSubscribed, (
-      track: RemoteAudioTrack,
-      publication: RemoteTrackPublication
+      track: RemoteTrack,
+      publication: RemoteTrackPublication,
+      _participant: RemoteParticipant
     ) => {
       if (track.kind === Track.Kind.Audio) {
         console.log('🎵 Audio track subscribed:', publication.trackSid);
         this.onLogMessage('Assistant audio connected');
 
-        const audioElement = track.attach();
+        const audioElement = (track as RemoteAudioTrack).attach();
         document.body.appendChild(audioElement);
         audioElement.play();
 
@@ -81,18 +85,19 @@ export class LiveKitClient {
     });
 
     this.room.on(RoomEvent.TrackUnsubscribed, (
-      track: RemoteAudioTrack,
-      publication: RemoteTrackPublication
+      track: RemoteTrack,
+      publication: RemoteTrackPublication,
+      _participant: RemoteParticipant
     ) => {
       if (track.kind === Track.Kind.Audio) {
         console.log('🔇 Audio track unsubscribed:', publication.trackSid);
-        track.detach().forEach((element) => element.remove());
+        (track as RemoteAudioTrack).detach().forEach((element) => element.remove());
       }
     });
 
     this.room.on(RoomEvent.DataReceived, (
       payload: Uint8Array,
-      participant?: any
+      _participant?: any
     ) => {
       try {
         const text = new TextDecoder().decode(payload);

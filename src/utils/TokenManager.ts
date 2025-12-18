@@ -7,12 +7,10 @@ export class TokenManager {
   private static readonly STORAGE_KEY = 'voice_assistant_token';
   private static readonly TOKEN_VALIDITY_DAYS = 30;
   private static readonly REFRESH_BUFFER_DAYS = 2; // Refresh 2 days before expiry
-  private baseUrl: string;
   private userId: string;
   private deviceId: string;
 
-  constructor(baseUrl: string, userId: string = 'web-user', deviceId?: string) {
-    this.baseUrl = baseUrl;
+  constructor(userId: string = 'web-user', deviceId?: string) {
     this.userId = userId;
     this.deviceId = deviceId || this.generateDeviceId();
   }

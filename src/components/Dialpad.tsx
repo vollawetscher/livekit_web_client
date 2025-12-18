@@ -10,7 +10,7 @@ interface DialpadProps {
   isConnected: boolean;
 }
 
-export default function Dialpad({ onDial, onHangup, isDialing, callStatus, isCallActive, isConnected }: DialpadProps) {
+export default function Dialpad({ onDial, onHangup, isDialing, isCallActive, isConnected }: DialpadProps) {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [contactName, setContactName] = useState('');
 
