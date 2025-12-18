@@ -1,13 +1,19 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
+  console.error('⚠️ Missing Supabase environment variables');
+  console.error('Please ensure your .env file contains:');
+  console.error('  VITE_SUPABASE_URL=your-supabase-url');
+  console.error('  VITE_SUPABASE_ANON_KEY=your-anon-key');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co',
+  supabaseAnonKey || 'placeholder-key'
+);
 
 export interface CallHistoryRecord {
   id?: string;
