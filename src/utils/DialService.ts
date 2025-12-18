@@ -19,7 +19,7 @@ export class DialService {
     contactName: string,
     sessionId: string
   ): Promise<DialResponse> {
-    const response = await fetch(`${this.baseUrl}/functions/v1/dial-pstn-call`, {
+    const response = await fetch(`${this.baseUrl}/functions/v1/dial-twilio-call`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${this.jwtToken}`,
