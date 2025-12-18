@@ -148,7 +148,7 @@ Deno.serve(async (req: Request) => {
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Dial>
-    <Sip>${livekitSipUri}?room=${encodeURIComponent(roomName)}&name=${encodeURIComponent(participantName || 'Guest')}</Sip>
+    <Sip>${livekitSipUri}?room=${encodeURIComponent(roomName)}&amp;name=${encodeURIComponent(participantName || 'Guest')}</Sip>
   </Dial>
 </Response>`;
 
