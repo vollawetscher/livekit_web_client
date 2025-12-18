@@ -30,7 +30,7 @@ Deno.serve(async (req: Request) => {
   try {
     const url = new URL(req.url);
 
-    // Handle TwiML request from Twilio
+    // Handle TwiML request from Twilio (public endpoint)
     if (url.pathname.includes('/twiml')) {
       const roomName = url.searchParams.get('room');
       const participantName = url.searchParams.get('name');
@@ -64,7 +64,39 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Handle call initiation request
+    // Handle call initiation request (requires authentication)
+    const authHeader = req.headers.get('Authorization');
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: "Missing or invalid authorization header" }),
+        {
+          status: 401,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+
+    // Verify the token is valid (not just the anon key)
+    if (token === anonKey) {
+      return new Response(
+        JSON.stringify({ error: "Please provide a user JWT token, not the anon key" }),
+        {
+          status: 401,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
+
     const twilioAccountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
     const twilioAuthToken = Deno.env.get("TWILIO_AUTH_TOKEN");
     const twilioFromNumber = Deno.env.get("TWILIO_FROM_NUMBER");
