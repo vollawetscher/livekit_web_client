@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { RoomServiceClient } from "npm:livekit-server-sdk@2.6.1";
+import { SipClient } from "npm:livekit-server-sdk@2.6.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -32,7 +32,7 @@ Deno.serve(async (req: Request) => {
     const apiKey = Deno.env.get("LIVEKIT_API_KEY");
     const apiSecret = Deno.env.get("LIVEKIT_API_SECRET");
     const livekitUrl = Deno.env.get("LIVEKIT_URL") || Deno.env.get("VITE_LIVEKIT_URL");
-    const sipTrunkName = "ck_outbound";
+    const sipTrunkId = "ck_outbound";
 
     if (!apiKey || !apiSecret) {
       throw new Error("LiveKit API credentials not configured");
@@ -78,8 +78,8 @@ Deno.serve(async (req: Request) => {
 
     console.log(`Initiating call to ${phoneNumber} (${contactName}) in room: ${sessionId}`);
 
-    // Initialize LiveKit Room Service Client
-    const roomService = new RoomServiceClient(
+    // Initialize LiveKit SIP Client
+    const sipClient = new SipClient(
       livekitUrl.replace('wss://', 'https://').replace('ws://', 'http://'),
       apiKey,
       apiSecret
@@ -89,11 +89,11 @@ Deno.serve(async (req: Request) => {
     const callId = `call-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 
     // Create SIP participant to dial out
-    const sipParticipant = await roomService.createSipParticipant(
+    const sipParticipant = await sipClient.createSipParticipant(
+      sipTrunkId,
+      phoneNumber,
       sessionId,
       {
-        sipTrunkId: sipTrunkName,
-        sipCallTo: phoneNumber,
         participantIdentity: `sip-${callId}`,
         participantName: contactName,
         participantMetadata: JSON.stringify({
@@ -103,6 +103,7 @@ Deno.serve(async (req: Request) => {
           direction: 'outbound',
           initiatedAt: new Date().toISOString(),
         }),
+        playDialtone: true,
       }
     );
 
