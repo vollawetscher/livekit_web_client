@@ -64,19 +64,32 @@ export class TokenManager {
   }
 
   private async requestNewToken(): Promise<string> {
-    const tokenUrl = `${this.baseUrl}/api/mobile/auth/token`;
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase configuration missing');
+    }
+
+    const tokenUrl = `${supabaseUrl}/functions/v1/generate-livekit-token`;
+    const roomName = import.meta.env.VITE_LIVEKIT_ROOM_NAME || 'voice-assistant-room';
 
     const response = await fetch(tokenUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseKey}`,
+      },
       body: JSON.stringify({
-        userId: this.userId,
-        deviceId: this.deviceId,
+        roomName: roomName,
+        participantIdentity: this.deviceId,
+        participantName: this.userId,
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`Token request failed: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`Token request failed: ${response.status} ${errorText}`);
     }
 
     const data = await response.json();
@@ -85,7 +98,7 @@ export class TokenManager {
     }
 
     this.storeToken(data.token);
-    console.log('Token stored successfully');
+    console.log('LiveKit token stored successfully');
 
     return data.token;
   }

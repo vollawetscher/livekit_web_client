@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Mic, MicOff, Wifi, WifiOff, Bug } from 'lucide-react';
 import { AudioRecorder } from '../utils/AudioRecorder';
-import { WebSocketClient, CallStatusEvent } from '../utils/WebSocketClient';
+import { LiveKitClient, CallStatusEvent } from '../utils/LiveKitClient';
 import { DialService } from '../utils/DialService';
 import { TokenManager } from '../utils/TokenManager';
 import { insertCallHistory, updateCallHistory } from '../utils/supabase';
@@ -10,7 +10,7 @@ import CallHistory from './CallHistory';
 
 export default function VoiceAssistant() {
   const [isConnected, setIsConnected] = useState(false);
-  const [serverUrl, setServerUrl] = useState('');
+  const [liveKitUrl, setLiveKitUrl] = useState('');
   const [jwtToken, setJwtToken] = useState('');
   const [logs, setLogs] = useState<string[]>([]);
   const [isLogsExpanded, setIsLogsExpanded] = useState(false);
@@ -25,7 +25,7 @@ export default function VoiceAssistant() {
   const [noiseThreshold, setNoiseThreshold] = useState<number | null>(null);
   const [enableVAD, setEnableVAD] = useState(import.meta.env.VITE_ENABLE_VAD !== 'false');
   const recorderRef = useRef<AudioRecorder | null>(null);
-  const wsClientRef = useRef<WebSocketClient | null>(null);
+  const liveKitClientRef = useRef<LiveKitClient | null>(null);
   const audioTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const tokenManagerRef = useRef<TokenManager | null>(null);
   const currentCallDataRef = useRef<{ phoneNumber: string; contactName: string } | null>(null);
@@ -61,26 +61,21 @@ export default function VoiceAssistant() {
     }
   };
 
-  // Load values from environment on mount
   useEffect(() => {
-    const envUrl = import.meta.env.VITE_SERVER_URL;
+    const envUrl = import.meta.env.VITE_LIVEKIT_URL;
 
     if (envUrl) {
-      setServerUrl(envUrl);
-      addLog('Loaded server URL from environment');
+      setLiveKitUrl(envUrl);
+      addLog('Loaded LiveKit URL from environment');
 
-      // Initialize TokenManager
-      const url = new URL(envUrl);
-      const baseUrl = `${url.protocol}//${url.host}`.replace('wss:', 'https:').replace('ws:', 'http:');
-      tokenManagerRef.current = new TokenManager(baseUrl);
+      tokenManagerRef.current = new TokenManager('', 'web-user');
       addLog('Token manager initialized');
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleStart = async () => {
-    if (!serverUrl) {
-      alert('Server URL not configured. Please set VITE_SERVER_URL in your .env file.');
+    if (!liveKitUrl) {
+      alert('LiveKit URL not configured. Please set VITE_LIVEKIT_URL in your .env file.');
       return;
     }
 
@@ -90,41 +85,29 @@ export default function VoiceAssistant() {
     }
 
     try {
-      addLog('Requesting authentication token...');
+      addLog('Requesting LiveKit token...');
       const token = await tokenManagerRef.current.getToken();
       setJwtToken(token);
-      addLog('Token acquired successfully');
-
-      const expiry = tokenManagerRef.current.getTokenExpiry();
-      if (expiry) {
-        addLog(`Token valid until: ${expiry.toLocaleDateString()}`);
-      }
-
-      // Start audio recording and calibration FIRST (if VAD enabled)
-      addLog('Starting audio recording...');
+      addLog('LiveKit token acquired successfully');
 
       if (enableVAD) {
         setIsCalibrating(true);
         addLog('Calibrating microphone - please remain quiet for 2 seconds...');
       } else {
-        addLog('VAD disabled - sending all audio continuously');
+        addLog('VAD disabled - monitoring audio levels only');
       }
 
-      // Create a promise that resolves when calibration is complete
       let calibrationResolve: () => void;
       const calibrationPromise = new Promise<void>((resolve) => {
         calibrationResolve = resolve;
       });
 
       recorderRef.current = new AudioRecorder(
-        (audioData) => {
-          wsClientRef.current?.sendAudio(audioData);
-        },
+        () => {},
         (level) => {
           setInputLevel(level);
         },
         (threshold) => {
-          // Calibration complete callback
           setIsCalibrating(false);
           setNoiseThreshold(threshold);
           if (threshold > 0) {
@@ -136,15 +119,11 @@ export default function VoiceAssistant() {
       );
 
       await recorderRef.current.start();
-
-      // Wait for calibration to complete (or skip if VAD disabled)
       await calibrationPromise;
-      addLog('Connecting to voice assistant...');
 
-      // Now connect to WebSocket AFTER calibration
-      wsClientRef.current = new WebSocketClient(
-        serverUrl,
-        token,
+      addLog('Connecting to LiveKit room...');
+
+      liveKitClientRef.current = new LiveKitClient(
         addLog,
         () => {
           setIsReceivingAudio(true);
@@ -153,7 +132,14 @@ export default function VoiceAssistant() {
         },
         handleCallStatus
       );
-      await wsClientRef.current.connect();
+
+      await liveKitClientRef.current.connect(liveKitUrl, token);
+      addLog('Publishing microphone to room...');
+      await liveKitClientRef.current.publishAudio({
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      });
 
       addLog('Voice assistant ready - speak normally now');
       setIsConnected(true);
@@ -171,9 +157,9 @@ export default function VoiceAssistant() {
       recorderRef.current = null;
     }
 
-    if (wsClientRef.current) {
-      wsClientRef.current.disconnect();
-      wsClientRef.current = null;
+    if (liveKitClientRef.current) {
+      liveKitClientRef.current.disconnect();
+      liveKitClientRef.current = null;
     }
 
     if (audioTimeoutRef.current) {
@@ -199,10 +185,10 @@ export default function VoiceAssistant() {
 
   const handleDebugStatus = () => {
     console.log('🔍 ===== DEBUG STATUS DUMP =====');
-    if (wsClientRef.current) {
-      wsClientRef.current.logStatus();
+    if (liveKitClientRef.current) {
+      liveKitClientRef.current.logStatus();
     } else {
-      console.log('❌ WebSocketClient: Not initialized');
+      console.log('❌ LiveKitClient: Not initialized');
     }
     if (recorderRef.current) {
       console.log('✅ AudioRecorder: Initialized');
@@ -214,7 +200,7 @@ export default function VoiceAssistant() {
   };
 
   const handleDial = async (phoneNumber: string, contactName: string) => {
-    if (!wsClientRef.current || !jwtToken || !serverUrl) {
+    if (!liveKitClientRef.current || !jwtToken) {
       alert('Connection not ready. Please start the call first.');
       return;
     }
@@ -227,12 +213,14 @@ export default function VoiceAssistant() {
 
       currentCallDataRef.current = { phoneNumber, contactName };
 
-      const sessionId = wsClientRef.current.getSessionId();
+      const sessionId = liveKitClientRef.current.getSessionId();
 
-      const url = new URL(serverUrl);
-      const baseUrl = `${url.protocol}//${url.host}`.replace('wss:', 'https:').replace('ws:', 'http:');
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      if (!supabaseUrl) {
+        throw new Error('Supabase URL not configured');
+      }
 
-      const dialService = new DialService(baseUrl, jwtToken);
+      const dialService = new DialService(supabaseUrl, jwtToken);
       const result = await dialService.dialContact(phoneNumber, contactName, sessionId);
 
       setCallStatus('initiated');
@@ -275,13 +263,13 @@ export default function VoiceAssistant() {
   };
 
   const handleHangup = () => {
-    if (!wsClientRef.current || !isCallActive) {
+    if (!liveKitClientRef.current || !isCallActive) {
       return;
     }
 
     try {
       addLog('Sending stop event to end call...');
-      wsClientRef.current.sendStop();
+      liveKitClientRef.current.sendStop();
       addLog('Stop event sent');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
