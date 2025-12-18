@@ -45,10 +45,18 @@ export default function VoiceAssistant() {
 
     if (event.status === 'ringing') {
       if (ringingAudioRef.current) {
-        ringingAudioRef.current.play().catch(err => console.error('Failed to play ringing sound:', err));
+        addLog('Playing ringing sound...');
+        ringingAudioRef.current.currentTime = 0;
+        ringingAudioRef.current.play()
+          .then(() => addLog('Ringing sound started'))
+          .catch(err => {
+            console.error('Failed to play ringing sound:', err);
+            addLog(`Ringing sound error: ${err.message}`);
+          });
       }
     } else {
-      if (ringingAudioRef.current) {
+      if (ringingAudioRef.current && !ringingAudioRef.current.paused) {
+        addLog('Stopping ringing sound');
         ringingAudioRef.current.pause();
         ringingAudioRef.current.currentTime = 0;
       }
@@ -92,8 +100,9 @@ export default function VoiceAssistant() {
       addLog('Token manager initialized');
     }
 
-    ringingAudioRef.current = new Audio('https://www.soundjay.com/phone/sounds/phone-calling-1.mp3');
+    ringingAudioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
     ringingAudioRef.current.loop = true;
+    ringingAudioRef.current.volume = 0.5;
 
     return () => {
       if (ringingAudioRef.current) {
@@ -225,16 +234,26 @@ export default function VoiceAssistant() {
       addLog(`SIP Participant: ${result.sipParticipantId}`);
 
       setTimeout(() => {
-        if (liveKitClientRef.current) {
+        if (liveKitClientRef.current && isCallActive) {
           const participants = Array.from(liveKitClientRef.current.getRoom().remoteParticipants.values());
-          const sipConnected = participants.some(p => p.identity === result.sipParticipantId);
+          const sipParticipant = participants.find(p => p.identity === result.sipParticipantId);
 
-          if (!sipConnected) {
+          const hasAudioTrack = sipParticipant?.audioTrackPublications.size ?? 0 > 0;
+
+          if (!hasAudioTrack) {
             setCallStatus('ringing');
             addLog('Call is ringing...');
+
+            if (ringingAudioRef.current) {
+              addLog('Starting ringing sound...');
+              ringingAudioRef.current.currentTime = 0;
+              ringingAudioRef.current.play()
+                .then(() => addLog('Ringing sound playing'))
+                .catch(err => addLog(`Ringing sound error: ${err.message}`));
+            }
           }
         }
-      }, 2000);
+      }, 1500);
 
       await insertCallHistory({
         phone_number: phoneNumber,

@@ -132,16 +132,23 @@ export class LiveKitClient {
 
     this.room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
       console.log('👤 Participant connected:', participant.identity);
+      if (participant.identity.startsWith('sip-')) {
+        this.onLogMessage(`SIP participant joined room: ${participant.identity}`);
+      }
+    });
+
+    this.room.on(RoomEvent.ParticipantDisconnected, (participant: RemoteParticipant) => {
+      console.log('👤 Participant disconnected:', participant.identity);
 
       if (participant.identity.startsWith('sip-')) {
-        this.onLogMessage(`SIP participant connected: ${participant.identity}`);
+        this.onLogMessage(`SIP participant left room: ${participant.identity}`);
 
         const metadata = participant.metadata ? JSON.parse(participant.metadata) : {};
         if (metadata.callId && metadata.phoneNumber) {
           if (this.onCallStatus) {
             this.onCallStatus({
               event: 'call-status',
-              status: 'answered',
+              status: 'completed',
               callId: metadata.callId,
               phoneNumber: metadata.phoneNumber,
               timestamp: Date.now(),
@@ -152,18 +159,18 @@ export class LiveKitClient {
       }
     });
 
-    this.room.on(RoomEvent.ParticipantDisconnected, (participant: RemoteParticipant) => {
-      console.log('👤 Participant disconnected:', participant.identity);
+    this.room.on(RoomEvent.TrackPublished, (publication, participant: RemoteParticipant) => {
+      console.log('📢 Track published:', publication.kind, 'by', participant.identity);
 
-      if (participant.identity.startsWith('sip-')) {
-        this.onLogMessage(`SIP participant disconnected: ${participant.identity}`);
+      if (participant.identity.startsWith('sip-') && publication.kind === Track.Kind.Audio) {
+        this.onLogMessage(`Call answered - audio track detected`);
 
         const metadata = participant.metadata ? JSON.parse(participant.metadata) : {};
         if (metadata.callId && metadata.phoneNumber) {
           if (this.onCallStatus) {
             this.onCallStatus({
               event: 'call-status',
-              status: 'completed',
+              status: 'answered',
               callId: metadata.callId,
               phoneNumber: metadata.phoneNumber,
               timestamp: Date.now(),
