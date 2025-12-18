@@ -346,8 +346,24 @@ Deno.serve(async (req: Request) => {
     logStep(executionLogs, 'Call ID generated', callId);
 
     // Build TwiML URL with room and participant info
-    const baseUrl = url.origin + url.pathname;
-    const twimlUrl = `${baseUrl}/twiml?room=${encodeURIComponent(sessionId)}&name=${encodeURIComponent(contactName)}&callId=${encodeURIComponent(callId)}`;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    if (!supabaseUrl) {
+      logStep(executionLogs, 'SUPABASE_URL not found', 'Environment variable missing', false);
+      return new Response(
+        JSON.stringify({
+          error: 'SUPABASE_URL environment variable not found',
+          executionLogs: url.searchParams.has('debug') ? executionLogs : undefined
+        }),
+        {
+          status: 500,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
+    const twimlUrl = `${supabaseUrl}/functions/v1/dial-twilio-call/twiml?room=${encodeURIComponent(sessionId)}&name=${encodeURIComponent(contactName)}&callId=${encodeURIComponent(callId)}`;
     logStep(executionLogs, 'TwiML URL built', twimlUrl.substring(0, 80) + '...');
 
     // Create call via Twilio REST API
@@ -360,7 +376,7 @@ Deno.serve(async (req: Request) => {
       From: twilioFromNumber,
       Url: twimlUrl,
       Method: 'GET',
-      StatusCallback: `${baseUrl}/status?callId=${callId}`,
+      StatusCallback: `${supabaseUrl}/functions/v1/dial-twilio-call/status?callId=${callId}`,
       StatusCallbackMethod: 'POST',
       StatusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'].join(' '),
     });
