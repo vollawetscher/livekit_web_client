@@ -32,7 +32,7 @@ Deno.serve(async (req: Request) => {
     const apiKey = Deno.env.get("LIVEKIT_API_KEY");
     const apiSecret = Deno.env.get("LIVEKIT_API_SECRET");
     const livekitUrl = Deno.env.get("LIVEKIT_URL") || Deno.env.get("VITE_LIVEKIT_URL");
-    const sipTrunkName = Deno.env.get("LIVEKIT_SIP_TRUNK_NAME");
+    const sipTrunkName = "ck_outbound";
 
     if (!apiKey || !apiSecret) {
       throw new Error("LiveKit API credentials not configured");
@@ -40,10 +40,6 @@ Deno.serve(async (req: Request) => {
 
     if (!livekitUrl) {
       throw new Error("LiveKit URL not configured");
-    }
-
-    if (!sipTrunkName) {
-      throw new Error("SIP trunk name not configured. Please set LIVEKIT_SIP_TRUNK_NAME environment variable");
     }
 
     const { phoneNumber, contactName, sessionId }: DialRequest = await req.json();
