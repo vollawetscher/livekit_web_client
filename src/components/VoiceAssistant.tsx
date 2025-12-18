@@ -197,11 +197,12 @@ export default function VoiceAssistant() {
       const sessionId = liveKitClientRef.current.getSessionId();
 
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      if (!supabaseUrl) {
-        throw new Error('Supabase URL not configured');
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      if (!supabaseUrl || !supabaseKey) {
+        throw new Error('Supabase configuration not found');
       }
 
-      const dialService = new DialService(supabaseUrl, jwtToken);
+      const dialService = new DialService(supabaseUrl, supabaseKey);
       const result = await dialService.dialContact(phoneNumber, contactName, sessionId);
 
       setCallStatus('initiated');
