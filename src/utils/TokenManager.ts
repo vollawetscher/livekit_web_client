@@ -1,14 +1,8 @@
-interface TokenData {
-  token: string;
-  expiresAt: number;
-}
-
 export class TokenManager {
-  private static readonly STORAGE_KEY = 'voice_assistant_token';
-  private static readonly TOKEN_VALIDITY_DAYS = 30;
-  private static readonly REFRESH_BUFFER_DAYS = 2; // Refresh 2 days before expiry
   private userId: string;
   private deviceId: string;
+  private currentToken: string | null = null;
+  private tokenExpiry: number | null = null;
 
   constructor(userId: string = 'web-user', deviceId?: string) {
     this.userId = userId;
@@ -24,37 +18,27 @@ export class TokenManager {
     return newId;
   }
 
-  private getStoredToken(): TokenData | null {
+  private parseJwtExpiry(token: string): number | null {
     try {
-      const stored = localStorage.getItem(TokenManager.STORAGE_KEY);
-      if (!stored) return null;
-
-      const data: TokenData = JSON.parse(stored);
-      return data;
+      const payload = token.split('.')[1];
+      const decoded = JSON.parse(atob(payload));
+      return decoded.exp ? decoded.exp * 1000 : null;
     } catch (error) {
-      console.error('Failed to parse stored token:', error);
+      console.error('Failed to parse JWT expiry:', error);
       return null;
     }
   }
 
-  private storeToken(token: string): void {
-    const expiresAt = Date.now() + (TokenManager.TOKEN_VALIDITY_DAYS * 24 * 60 * 60 * 1000);
-    const data: TokenData = { token, expiresAt };
-    localStorage.setItem(TokenManager.STORAGE_KEY, JSON.stringify(data));
-  }
-
-  private isTokenValid(tokenData: TokenData): boolean {
-    const now = Date.now();
-    const bufferTime = TokenManager.REFRESH_BUFFER_DAYS * 24 * 60 * 60 * 1000;
-    return tokenData.expiresAt - now > bufferTime;
+  private isTokenValid(): boolean {
+    if (!this.currentToken || !this.tokenExpiry) return false;
+    const bufferTime = 5 * 60 * 1000;
+    return this.tokenExpiry - Date.now() > bufferTime;
   }
 
   async getToken(): Promise<string> {
-    const stored = this.getStoredToken();
-
-    if (stored && this.isTokenValid(stored)) {
-      console.log('Using valid stored token');
-      return stored.token;
+    if (this.currentToken && this.isTokenValid()) {
+      console.log('Using valid cached token');
+      return this.currentToken;
     }
 
     console.log('Requesting new token from server');
@@ -95,18 +79,21 @@ export class TokenManager {
       throw new Error('No token in response');
     }
 
-    this.storeToken(data.token);
-    console.log('LiveKit token stored successfully');
+    this.currentToken = data.token;
+    this.tokenExpiry = this.parseJwtExpiry(data.token);
+
+    const expiryDate = this.tokenExpiry ? new Date(this.tokenExpiry).toLocaleString() : 'unknown';
+    console.log(`LiveKit token received (expires: ${expiryDate})`);
 
     return data.token;
   }
 
   clearToken(): void {
-    localStorage.removeItem(TokenManager.STORAGE_KEY);
+    this.currentToken = null;
+    this.tokenExpiry = null;
   }
 
   getTokenExpiry(): Date | null {
-    const stored = this.getStoredToken();
-    return stored ? new Date(stored.expiresAt) : null;
+    return this.tokenExpiry ? new Date(this.tokenExpiry) : null;
   }
 }
