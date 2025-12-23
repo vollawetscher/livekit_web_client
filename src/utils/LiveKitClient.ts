@@ -6,8 +6,12 @@ import {
   RemoteTrack,
   Track,
   LocalAudioTrack,
+  LocalVideoTrack,
   createLocalAudioTrack,
+  createLocalVideoTrack,
   AudioCaptureOptions,
+  VideoCaptureOptions,
+  VideoPresets,
   DisconnectReason,
   RemoteParticipant,
 } from 'livekit-client';
@@ -29,6 +33,7 @@ export class LiveKitClient {
   private isConnected = false;
   private sessionId: string = '';
   private localAudioTrack: LocalAudioTrack | null = null;
+  private localVideoTrack: LocalVideoTrack | null = null;
 
   constructor(
     onLogMessage: (msg: string) => void,
@@ -276,6 +281,11 @@ export class LiveKitClient {
       this.localAudioTrack = null;
     }
 
+    if (this.localVideoTrack) {
+      this.localVideoTrack.stop();
+      this.localVideoTrack = null;
+    }
+
     this.room.disconnect();
     this.isConnected = false;
     this.sessionId = '';
@@ -293,6 +303,66 @@ export class LiveKitClient {
 
   getRoom(): Room {
     return this.room;
+  }
+
+  async publishVideo(videoOptions?: VideoCaptureOptions): Promise<void> {
+    try {
+      console.log('📹 Creating local video track...');
+
+      const options: VideoCaptureOptions = videoOptions || {
+        resolution: VideoPresets.h720.resolution,
+        facingMode: 'user',
+      };
+
+      this.localVideoTrack = await createLocalVideoTrack(options);
+
+      console.log('📹 Publishing video track to room...');
+      await this.room.localParticipant.publishTrack(this.localVideoTrack);
+
+      this.onLogMessage('Camera connected');
+      console.log('✅ Video track published');
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Failed to publish video';
+      console.error('❌ Failed to publish video:', error);
+      this.onLogMessage(`Video error: ${errorMsg}`);
+      throw error;
+    }
+  }
+
+  async unpublishVideo(): Promise<void> {
+    if (this.localVideoTrack) {
+      console.log('📹 Unpublishing video track...');
+      await this.room.localParticipant.unpublishTrack(this.localVideoTrack);
+      this.localVideoTrack.stop();
+      this.localVideoTrack = null;
+      this.onLogMessage('Camera disconnected');
+    }
+  }
+
+  async toggleVideo(): Promise<boolean> {
+    if (this.localVideoTrack) {
+      await this.unpublishVideo();
+      return false;
+    } else {
+      await this.publishVideo();
+      return true;
+    }
+  }
+
+  getParticipants(): RemoteParticipant[] {
+    return Array.from(this.room.remoteParticipants.values());
+  }
+
+  getLocalParticipant() {
+    return this.room.localParticipant;
+  }
+
+  getAllParticipants(): (RemoteParticipant | typeof this.room.localParticipant)[] {
+    return [this.room.localParticipant, ...this.getParticipants()];
+  }
+
+  isVideoEnabled(): boolean {
+    return this.localVideoTrack !== null;
   }
 
   logStatus(): void {

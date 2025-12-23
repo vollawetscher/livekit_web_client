@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Mic, Wifi, WifiOff, Bug } from 'lucide-react';
+import { Mic, Wifi, WifiOff, Bug, Video } from 'lucide-react';
 import { AudioRecorder } from '../utils/AudioRecorder';
 import { LiveKitClient, CallStatusEvent } from '../utils/LiveKitClient';
 import { DialService } from '../utils/DialService';
@@ -7,6 +7,9 @@ import { TokenManager } from '../utils/TokenManager';
 import { insertCallHistory, updateCallHistory } from '../utils/supabase';
 import Dialpad from './Dialpad';
 import CallHistory from './CallHistory';
+import ParticipantsPanel from './ParticipantsPanel';
+import VideoGrid from './VideoGrid';
+import RoomInfo from './RoomInfo';
 
 export default function VoiceAssistant() {
   const [isConnected, setIsConnected] = useState(false);
@@ -22,6 +25,9 @@ export default function VoiceAssistant() {
   const [isCallActive, setIsCallActive] = useState(false);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const [activeSipParticipantId, setActiveSipParticipantId] = useState<string | null>(null);
+  const [isVideoEnabled, setIsVideoEnabled] = useState(false);
+  const [audioLevels, setAudioLevels] = useState<Map<string, number>>(new Map());
+  const [activeSpeakers, setActiveSpeakers] = useState<Set<string>>(new Set());
   const recorderRef = useRef<AudioRecorder | null>(null);
   const liveKitClientRef = useRef<LiveKitClient | null>(null);
   const audioTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -191,7 +197,25 @@ export default function VoiceAssistant() {
     setIsConnected(false);
     setInputLevel(0);
     setIsReceivingAudio(false);
+    setIsVideoEnabled(false);
+    setAudioLevels(new Map());
+    setActiveSpeakers(new Set());
     addLog('Disconnected');
+  };
+
+  const handleToggleVideo = async () => {
+    if (!liveKitClientRef.current || !isConnected) {
+      return;
+    }
+
+    try {
+      const newVideoState = await liveKitClientRef.current.toggleVideo();
+      setIsVideoEnabled(newVideoState);
+      addLog(newVideoState ? 'Camera enabled' : 'Camera disabled');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      addLog(`Video toggle error: ${errorMessage}`);
+    }
   };
 
   const handleToggleConnection = () => {
@@ -329,7 +353,7 @@ export default function VoiceAssistant() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 text-white">
-      <div className="container mx-auto px-4 py-4 max-w-2xl">
+      <div className="container mx-auto px-4 py-4 max-w-7xl">
         <div className="text-center mb-4">
           <h1 className="text-2xl font-bold flex items-center justify-center gap-2">
             <Mic className="w-6 h-6" />
@@ -337,7 +361,7 @@ export default function VoiceAssistant() {
           </h1>
         </div>
 
-        <div className="mb-3 grid grid-cols-2 gap-2">
+        <div className="mb-3 grid grid-cols-2 md:grid-cols-4 gap-2">
           <button
             onClick={handleToggleConnection}
             className={`py-2 rounded-lg font-semibold text-sm flex items-center justify-center gap-1 transition-all shadow-lg ${
@@ -357,6 +381,19 @@ export default function VoiceAssistant() {
                 Connect
               </>
             )}
+          </button>
+
+          <button
+            onClick={handleToggleVideo}
+            disabled={!isConnected}
+            className={`py-2 rounded-lg font-semibold text-sm flex items-center justify-center gap-1 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
+              isVideoEnabled
+                ? 'bg-blue-600 hover:bg-blue-700 active:scale-95'
+                : 'bg-slate-700 hover:bg-slate-600 active:scale-95'
+            }`}
+          >
+            <Video className="w-4 h-4" />
+            {isVideoEnabled ? 'Stop Video' : 'Start Video'}
           </button>
 
           <button
@@ -418,6 +455,36 @@ export default function VoiceAssistant() {
             </div>
           </div>
         )}
+
+        {isConnected && (
+          <div className="mb-3">
+            <RoomInfo
+              room={liveKitClientRef.current?.getRoom() || null}
+              participantCount={liveKitClientRef.current?.getRoom().numParticipants || 0}
+            />
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-4">
+          {isConnected && (
+            <div className="lg:col-span-1 space-y-3">
+              <ParticipantsPanel
+                room={liveKitClientRef.current?.getRoom() || null}
+                audioLevels={audioLevels}
+                activeSpeakers={activeSpeakers}
+              />
+            </div>
+          )}
+
+          <div className={`${isConnected ? 'lg:col-span-3' : 'lg:col-span-4'}`}>
+            <div className="bg-slate-800/30 rounded-lg border border-slate-700 p-4 mb-4">
+              <VideoGrid
+                room={liveKitClientRef.current?.getRoom() || null}
+                activeSpeakers={activeSpeakers}
+              />
+            </div>
+          </div>
+        </div>
 
         {callStatus && (
           <div className={`mb-3 p-2 rounded-lg border ${
