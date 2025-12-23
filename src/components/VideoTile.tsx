@@ -15,43 +15,42 @@ export default function VideoTile({
 }: VideoTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hasAudio = participant.isMicrophoneEnabled;
-  const hasVideo = participant.isCameraEnabled;
   const identity = participant.identity;
   const isSip = identity.startsWith('sip-');
 
   const displayName = isLocal ? 'You' : isSip ? 'Phone Call' : identity;
 
+  let hasVideo = false;
+  let videoTrack: RemoteVideoTrack | LocalVideoTrack | undefined;
+
+  if (isLocal) {
+    const localParticipant = participant as LocalParticipant;
+    const publication = localParticipant.getTrackPublication(Track.Source.Camera);
+    videoTrack = publication?.track as LocalVideoTrack;
+    hasVideo = !!videoTrack;
+  } else {
+    const remoteParticipant = participant as RemoteParticipant;
+    const cameraPublication = Array.from(remoteParticipant.videoTrackPublications.values())
+      .find(pub => pub.source === Track.Source.Camera);
+
+    if (cameraPublication?.isSubscribed && cameraPublication?.track) {
+      videoTrack = cameraPublication.track as RemoteVideoTrack;
+      hasVideo = true;
+    }
+  }
+
   useEffect(() => {
-    if (!videoRef.current || !hasVideo) return;
+    if (!videoRef.current || !videoTrack) return;
 
-    let videoTrack: RemoteVideoTrack | LocalVideoTrack | undefined;
-
-    if (isLocal) {
-      const localParticipant = participant as LocalParticipant;
-      const publication = localParticipant.getTrackPublication(Track.Source.Camera);
-      videoTrack = publication?.track as LocalVideoTrack;
-    } else {
-      const remoteParticipant = participant as RemoteParticipant;
-      const cameraPublication = Array.from(remoteParticipant.videoTrackPublications.values())
-        .find(pub => pub.source === Track.Source.Camera);
-      videoTrack = cameraPublication?.track as RemoteVideoTrack;
-
-      if (!videoTrack && cameraPublication?.isSubscribed) {
-        videoTrack = cameraPublication.videoTrack;
-      }
-    }
-
-    if (videoTrack && videoRef.current) {
-      console.log('Attaching video track for', participant.identity, videoTrack);
-      videoTrack.attach(videoRef.current);
-    }
+    console.log('Attaching video track for', participant.identity, videoTrack);
+    videoTrack.attach(videoRef.current);
 
     return () => {
       if (videoTrack && videoRef.current) {
         videoTrack.detach(videoRef.current);
       }
     };
-  }, [participant, isLocal, hasVideo]);
+  }, [participant, videoTrack]);
 
   return (
     <div
