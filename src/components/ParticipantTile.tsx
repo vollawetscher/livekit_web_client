@@ -46,13 +46,13 @@ export default function ParticipantTile({
 
   const handleMuteToggle = () => {
     if (onMuteParticipant && !isLocal) {
-      onMuteParticipant(identity, !hasAudio);
+      onMuteParticipant(identity, hasAudio);
     }
   };
 
   const handleVideoToggle = () => {
     if (onToggleParticipantVideo && !isLocal) {
-      onToggleParticipantVideo(identity, !hasVideo);
+      onToggleParticipantVideo(identity, hasVideo);
     }
   };
 

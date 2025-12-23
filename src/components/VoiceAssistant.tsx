@@ -4,7 +4,7 @@ import { AudioRecorder } from '../utils/AudioRecorder';
 import { LiveKitClient, CallStatusEvent } from '../utils/LiveKitClient';
 import { DialService } from '../utils/DialService';
 import { TokenManager } from '../utils/TokenManager';
-import { insertCallHistory, updateCallHistory, getUserProfile, UserProfile } from '../utils/supabase';
+import { insertCallHistory, updateCallHistory, getUserProfile, upsertUserProfile, UserProfile } from '../utils/supabase';
 import Dialpad from './Dialpad';
 import CallHistory from './CallHistory';
 import ParticipantsPanel from './ParticipantsPanel';
@@ -110,9 +110,21 @@ export default function VoiceAssistant() {
     }
     setUserId(storedUserId);
 
-    getUserProfile(storedUserId).then(profile => {
+    getUserProfile(storedUserId).then(async profile => {
       if (profile) {
         setUserProfile(profile);
+      } else {
+        try {
+          const newProfile = await upsertUserProfile({
+            user_id: storedUserId,
+            display_name: storedUserId,
+          });
+          setUserProfile(newProfile);
+          addLog('Profile created. Set your display name in Settings.');
+        } catch (err) {
+          console.error('Failed to create user profile:', err);
+          addLog('Warning: Could not create user profile');
+        }
       }
     }).catch(err => {
       console.error('Failed to load user profile:', err);

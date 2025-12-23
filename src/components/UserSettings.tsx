@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, User, Save } from 'lucide-react';
 import { getUserProfile, upsertUserProfile, UserProfile } from '../utils/supabase';
+import { clearProfileCache } from '../utils/ProfileService';
 
 interface UserSettingsProps {
   userId: string;
@@ -50,6 +51,7 @@ export default function UserSettings({ userId, isOpen, onClose, onProfileUpdate 
       };
 
       const savedProfile = await upsertUserProfile(profile);
+      clearProfileCache();
       onProfileUpdate(savedProfile);
       onClose();
     } catch (err) {
