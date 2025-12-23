@@ -190,6 +190,16 @@ export default function VoiceAssistant() {
         autoGainControl: true,
       });
 
+      addLog('Enabling camera...');
+      try {
+        await liveKitClientRef.current.publishVideo();
+        setIsVideoEnabled(true);
+        addLog('Camera enabled automatically');
+      } catch (error) {
+        addLog('Camera could not be enabled automatically');
+        console.warn('Failed to auto-enable video:', error);
+      }
+
       addLog('Voice assistant ready - speak normally now');
       setIsConnected(true);
     } catch (error) {
