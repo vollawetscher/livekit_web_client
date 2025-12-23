@@ -99,56 +99,61 @@ export default function ParticipantTile({
               </span>
             )}
           </div>
-          {isCurrentUserAdmin && !isLocal && !isSip && (
-            <div className="flex items-center gap-1 flex-shrink-0">
+
+          <div className="flex items-center gap-2 mt-1">
+            {isCurrentUserAdmin && !isLocal && !isSip ? (
               <button
                 onClick={handleMuteToggle}
                 className="p-1 rounded hover:bg-slate-600 transition-colors"
-                title={hasAudio ? 'Mute participant' : 'Unmute participant'}
+                title={hasAudio ? 'Click to mute' : 'Click to unmute'}
               >
                 {hasAudio ? (
-                  <Mic className="w-3 h-3 text-green-400 hover:text-white" />
+                  <Mic className="w-3 h-3 text-green-400" />
                 ) : (
-                  <MicOff className="w-3 h-3 text-slate-400 hover:text-white" />
+                  <MicOff className="w-3 h-3 text-slate-500" />
                 )}
               </button>
+            ) : (
+              <div className="flex items-center gap-1">
+                {hasAudio ? (
+                  <Mic className="w-3 h-3 text-green-400" />
+                ) : (
+                  <MicOff className="w-3 h-3 text-slate-500" />
+                )}
+              </div>
+            )}
+
+            {isCurrentUserAdmin && !isLocal && !isSip ? (
               <button
                 onClick={handleVideoToggle}
                 className="p-1 rounded hover:bg-slate-600 transition-colors"
-                title={hasVideo ? 'Disable participant video' : 'Enable participant video'}
+                title={hasVideo ? 'Click to disable video' : 'Click to enable video'}
               >
                 {hasVideo ? (
-                  <VideoIcon className="w-3 h-3 text-blue-400 hover:text-white" />
+                  <VideoIcon className="w-3 h-3 text-blue-400" />
                 ) : (
-                  <VideoOff className="w-3 h-3 text-slate-400 hover:text-white" />
+                  <VideoOff className="w-3 h-3 text-slate-500" />
                 )}
               </button>
+            ) : (
+              <div className="flex items-center gap-1">
+                {hasVideo ? (
+                  <VideoIcon className="w-3 h-3 text-blue-400" />
+                ) : (
+                  <VideoOff className="w-3 h-3 text-slate-500" />
+                )}
+              </div>
+            )}
+
+            {isCurrentUserAdmin && !isLocal && !isSip && (
               <button
                 onClick={handleKick}
                 className="p-1 rounded hover:bg-red-600 transition-colors"
                 title="Remove participant"
               >
-                <UserX className="w-3 h-3 text-red-400 hover:text-white" />
+                <UserX className="w-3 h-3 text-red-400" />
               </button>
-            </div>
-          )}
-
-          <div className="flex items-center gap-2 mt-1">
-            <div className="flex items-center gap-1">
-              {hasAudio ? (
-                <Mic className="w-3 h-3 text-green-400" />
-              ) : (
-                <MicOff className="w-3 h-3 text-slate-500" />
-              )}
-            </div>
-
-            <div className="flex items-center gap-1">
-              {hasVideo ? (
-                <VideoIcon className="w-3 h-3 text-blue-400" />
-              ) : (
-                <VideoOff className="w-3 h-3 text-slate-500" />
-              )}
-            </div>
+            )}
 
             {hasAudio && (
               <div className="flex items-center gap-0.5 h-3">
