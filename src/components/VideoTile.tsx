@@ -22,25 +22,33 @@ export default function VideoTile({
   const displayName = isLocal ? 'You' : isSip ? 'Phone Call' : identity;
 
   useEffect(() => {
-    if (!videoRef.current) return;
+    if (!videoRef.current || !hasVideo) return;
 
     let videoTrack: RemoteVideoTrack | LocalVideoTrack | undefined;
 
     if (isLocal) {
       const localParticipant = participant as LocalParticipant;
-      videoTrack = localParticipant.getTrackPublication(Track.Source.Camera)?.track as LocalVideoTrack;
+      const publication = localParticipant.getTrackPublication(Track.Source.Camera);
+      videoTrack = publication?.track as LocalVideoTrack;
     } else {
       const remoteParticipant = participant as RemoteParticipant;
-      videoTrack = remoteParticipant.getTrackPublication(Track.Source.Camera)?.track as RemoteVideoTrack;
+      const cameraPublication = Array.from(remoteParticipant.videoTrackPublications.values())
+        .find(pub => pub.source === Track.Source.Camera);
+      videoTrack = cameraPublication?.track as RemoteVideoTrack;
+
+      if (!videoTrack && cameraPublication?.isSubscribed) {
+        videoTrack = cameraPublication.videoTrack;
+      }
     }
 
-    if (videoTrack) {
+    if (videoTrack && videoRef.current) {
+      console.log('Attaching video track for', participant.identity, videoTrack);
       videoTrack.attach(videoRef.current);
     }
 
     return () => {
-      if (videoTrack) {
-        videoTrack.detach();
+      if (videoTrack && videoRef.current) {
+        videoTrack.detach(videoRef.current);
       }
     };
   }, [participant, isLocal, hasVideo]);

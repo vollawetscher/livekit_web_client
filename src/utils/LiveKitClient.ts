@@ -74,11 +74,11 @@ export class LiveKitClient {
     this.room.on(RoomEvent.TrackSubscribed, (
       track: RemoteTrack,
       publication: RemoteTrackPublication,
-      _participant: RemoteParticipant
+      participant: RemoteParticipant
     ) => {
       if (track.kind === Track.Kind.Audio) {
-        console.log('🎵 Audio track subscribed:', publication.trackSid);
-        this.onLogMessage('Assistant audio connected');
+        console.log('🎵 Audio track subscribed:', publication.trackSid, 'from', participant.identity);
+        this.onLogMessage('Audio track connected from ' + participant.identity);
 
         const audioElement = (track as RemoteAudioTrack).attach();
         document.body.appendChild(audioElement);
@@ -87,16 +87,19 @@ export class LiveKitClient {
         if (this.onAudioReceived) {
           this.onAudioReceived();
         }
+      } else if (track.kind === Track.Kind.Video) {
+        console.log('📹 Video track subscribed:', publication.trackSid, 'from', participant.identity);
+        this.onLogMessage('Video track connected from ' + participant.identity);
       }
     });
 
     this.room.on(RoomEvent.TrackUnsubscribed, (
       track: RemoteTrack,
       publication: RemoteTrackPublication,
-      _participant: RemoteParticipant
+      participant: RemoteParticipant
     ) => {
+      console.log('Track unsubscribed:', track.kind, publication.trackSid, 'from', participant.identity);
       if (track.kind === Track.Kind.Audio) {
-        console.log('🔇 Audio track unsubscribed:', publication.trackSid);
         (track as RemoteAudioTrack).detach().forEach((element) => element.remove());
       }
     });

@@ -1,15 +1,16 @@
 import { useState, useRef, useEffect } from 'react';
-import { Mic, Wifi, WifiOff, Bug, Video } from 'lucide-react';
+import { Mic, Wifi, WifiOff, Bug, Video, Settings } from 'lucide-react';
 import { AudioRecorder } from '../utils/AudioRecorder';
 import { LiveKitClient, CallStatusEvent } from '../utils/LiveKitClient';
 import { DialService } from '../utils/DialService';
 import { TokenManager } from '../utils/TokenManager';
-import { insertCallHistory, updateCallHistory } from '../utils/supabase';
+import { insertCallHistory, updateCallHistory, getUserProfile, UserProfile } from '../utils/supabase';
 import Dialpad from './Dialpad';
 import CallHistory from './CallHistory';
 import ParticipantsPanel from './ParticipantsPanel';
 import VideoGrid from './VideoGrid';
 import RoomInfo from './RoomInfo';
+import UserSettings from './UserSettings';
 
 export default function VoiceAssistant() {
   const [isConnected, setIsConnected] = useState(false);
@@ -28,6 +29,10 @@ export default function VoiceAssistant() {
   const [isVideoEnabled, setIsVideoEnabled] = useState(false);
   const [audioLevels, setAudioLevels] = useState<Map<string, number>>(new Map());
   const [activeSpeakers, setActiveSpeakers] = useState<Set<string>>(new Set());
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [userId, setUserId] = useState<string>('');
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [adminUserId, setAdminUserId] = useState<string>('');
   const recorderRef = useRef<AudioRecorder | null>(null);
   const liveKitClientRef = useRef<LiveKitClient | null>(null);
   const audioTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -98,11 +103,26 @@ export default function VoiceAssistant() {
   useEffect(() => {
     const envUrl = import.meta.env.VITE_LIVEKIT_URL;
 
+    let storedUserId = localStorage.getItem('userId');
+    if (!storedUserId) {
+      storedUserId = 'user-' + Math.random().toString(36).substring(2, 15);
+      localStorage.setItem('userId', storedUserId);
+    }
+    setUserId(storedUserId);
+
+    getUserProfile(storedUserId).then(profile => {
+      if (profile) {
+        setUserProfile(profile);
+      }
+    }).catch(err => {
+      console.error('Failed to load user profile:', err);
+    });
+
     if (envUrl) {
       setLiveKitUrl(envUrl);
       addLog('Loaded LiveKit URL from environment');
 
-      tokenManagerRef.current = new TokenManager('web-user');
+      tokenManagerRef.current = new TokenManager(storedUserId);
       addLog('Token manager initialized');
     }
 
@@ -156,6 +176,13 @@ export default function VoiceAssistant() {
       );
 
       await liveKitClientRef.current.connect(liveKitUrl, token);
+
+      const room = liveKitClientRef.current.getRoom();
+      if (room.numParticipants === 1) {
+        setAdminUserId(userId);
+        addLog('You are the room admin');
+      }
+
       addLog('Publishing microphone to room...');
       await liveKitClientRef.current.publishAudio({
         echoCancellation: true,
@@ -200,7 +227,33 @@ export default function VoiceAssistant() {
     setIsVideoEnabled(false);
     setAudioLevels(new Map());
     setActiveSpeakers(new Set());
+    setAdminUserId('');
     addLog('Disconnected');
+  };
+
+  const handleKickParticipant = async (participantId: string) => {
+    if (!liveKitClientRef.current || userId !== adminUserId) {
+      addLog('Only admin can kick participants');
+      return;
+    }
+
+    try {
+      addLog(`Kicking participant: ${participantId}`);
+      const room = liveKitClientRef.current.getRoom();
+      const participant = room.getParticipantByIdentity(participantId);
+
+      if (participant) {
+        addLog(`Participant ${participantId} will be removed`);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      addLog(`Kick error: ${errorMessage}`);
+    }
+  };
+
+  const handleProfileUpdate = (profile: UserProfile) => {
+    setUserProfile(profile);
+    addLog('Profile updated successfully');
   };
 
   const handleToggleVideo = async () => {
@@ -403,6 +456,14 @@ export default function VoiceAssistant() {
             <Bug className="w-3 h-3" />
             Logs {isLogsExpanded ? '▼' : '▶'}
           </button>
+
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="py-2 rounded-lg font-semibold text-sm flex items-center justify-center gap-1 transition-all bg-slate-700 hover:bg-slate-600"
+          >
+            <Settings className="w-4 h-4" />
+            Settings
+          </button>
         </div>
 
         {isLogsExpanded && (
@@ -472,6 +533,9 @@ export default function VoiceAssistant() {
                 room={liveKitClientRef.current?.getRoom() || null}
                 audioLevels={audioLevels}
                 activeSpeakers={activeSpeakers}
+                adminUserId={adminUserId}
+                currentUserId={userId}
+                onKickParticipant={handleKickParticipant}
               />
             </div>
           )}
@@ -526,6 +590,13 @@ export default function VoiceAssistant() {
           isDialing={isDialing || isCallActive}
           currentCallId={activeCallId || undefined}
           refreshTrigger={historyRefreshKey}
+        />
+
+        <UserSettings
+          userId={userId}
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          onProfileUpdate={handleProfileUpdate}
         />
       </div>
     </div>

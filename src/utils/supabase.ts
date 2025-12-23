@@ -59,3 +59,41 @@ export async function getCallHistory(limit = 50) {
   if (error) throw error;
   return data || [];
 }
+
+export interface UserProfile {
+  id?: string;
+  user_id: string;
+  display_name: string;
+  avatar_url?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export async function getUserProfile(userId: string): Promise<UserProfile | null> {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function upsertUserProfile(profile: UserProfile): Promise<UserProfile> {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .upsert({
+      user_id: profile.user_id,
+      display_name: profile.display_name,
+      avatar_url: profile.avatar_url,
+      updated_at: new Date().toISOString(),
+    }, {
+      onConflict: 'user_id'
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}

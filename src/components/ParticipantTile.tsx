@@ -1,18 +1,24 @@
-import { Mic, MicOff, Video as VideoIcon, VideoOff, User } from 'lucide-react';
-import { RemoteParticipant, LocalParticipant, Participant } from 'livekit-client';
+import { Mic, MicOff, Video as VideoIcon, VideoOff, User, UserX, Crown } from 'lucide-react';
+import { RemoteParticipant, LocalParticipant } from 'livekit-client';
 
 interface ParticipantTileProps {
   participant: RemoteParticipant | LocalParticipant;
   isLocal?: boolean;
   isSpeaking?: boolean;
   audioLevel?: number;
+  isAdmin?: boolean;
+  isCurrentUserAdmin?: boolean;
+  onKickParticipant?: (participantId: string) => void;
 }
 
 export default function ParticipantTile({
   participant,
   isLocal = false,
   isSpeaking = false,
-  audioLevel = 0
+  audioLevel = 0,
+  isAdmin = false,
+  isCurrentUserAdmin = false,
+  onKickParticipant
 }: ParticipantTileProps) {
   const hasAudio = participant.isMicrophoneEnabled;
   const hasVideo = participant.isCameraEnabled;
@@ -20,6 +26,12 @@ export default function ParticipantTile({
   const isSip = identity.startsWith('sip-');
 
   const displayName = isLocal ? 'You' : isSip ? 'Phone Call' : identity;
+
+  const handleKick = () => {
+    if (onKickParticipant && !isLocal) {
+      onKickParticipant(identity);
+    }
+  };
 
   const getAudioBars = () => {
     const barCount = 5;
@@ -53,21 +65,33 @@ export default function ParticipantTile({
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
             <p className="font-medium text-sm text-white truncate">
               {displayName}
             </p>
+            {isAdmin && (
+              <Crown className="w-3 h-3 text-amber-400 flex-shrink-0" title="Room Admin" />
+            )}
             {isLocal && (
-              <span className="px-1.5 py-0.5 text-[10px] bg-blue-600 text-white rounded">
+              <span className="px-1.5 py-0.5 text-[10px] bg-blue-600 text-white rounded flex-shrink-0">
                 YOU
               </span>
             )}
             {isSip && (
-              <span className="px-1.5 py-0.5 text-[10px] bg-amber-600 text-white rounded">
+              <span className="px-1.5 py-0.5 text-[10px] bg-amber-600 text-white rounded flex-shrink-0">
                 PSTN
               </span>
             )}
           </div>
+          {isCurrentUserAdmin && !isLocal && !isSip && (
+            <button
+              onClick={handleKick}
+              className="p-1 rounded hover:bg-red-600 transition-colors flex-shrink-0"
+              title="Remove participant"
+            >
+              <UserX className="w-3 h-3 text-red-400 hover:text-white" />
+            </button>
+          )}
 
           <div className="flex items-center gap-2 mt-1">
             <div className="flex items-center gap-1">

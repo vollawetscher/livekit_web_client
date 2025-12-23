@@ -7,12 +7,18 @@ interface ParticipantsPanelProps {
   room: Room | null;
   audioLevels: Map<string, number>;
   activeSpeakers: Set<string>;
+  adminUserId?: string;
+  currentUserId?: string;
+  onKickParticipant?: (participantId: string) => void;
 }
 
 export default function ParticipantsPanel({
   room,
   audioLevels,
-  activeSpeakers
+  activeSpeakers,
+  adminUserId,
+  currentUserId,
+  onKickParticipant
 }: ParticipantsPanelProps) {
   const [participants, setParticipants] = useState<(RemoteParticipant | LocalParticipant)[]>([]);
   const [isExpanded, setIsExpanded] = useState(true);
@@ -78,6 +84,8 @@ export default function ParticipantsPanel({
               const isLocal = participant === room.localParticipant;
               const isSpeaking = activeSpeakers.has(participant.identity);
               const audioLevel = audioLevels.get(participant.identity) || 0;
+              const isAdmin = participant.identity === adminUserId;
+              const isCurrentUserAdmin = currentUserId === adminUserId;
 
               return (
                 <ParticipantTile
@@ -86,6 +94,9 @@ export default function ParticipantsPanel({
                   isLocal={isLocal}
                   isSpeaking={isSpeaking}
                   audioLevel={audioLevel}
+                  isAdmin={isAdmin}
+                  isCurrentUserAdmin={isCurrentUserAdmin}
+                  onKickParticipant={onKickParticipant}
                 />
               );
             })
