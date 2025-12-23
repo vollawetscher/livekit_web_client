@@ -1,24 +1,31 @@
 import { useEffect, useRef } from 'react';
 import { Mic, MicOff, Video as VideoIcon, VideoOff, User } from 'lucide-react';
 import { RemoteParticipant, LocalParticipant, RemoteVideoTrack, LocalVideoTrack, Track } from 'livekit-client';
+import { UserProfile, getDisplayName } from '../utils/ProfileService';
 
 interface VideoTileProps {
   participant: RemoteParticipant | LocalParticipant;
   isLocal?: boolean;
   isSpeaking?: boolean;
+  userProfiles?: Map<string, UserProfile>;
 }
 
 export default function VideoTile({
   participant,
   isLocal = false,
-  isSpeaking = false
+  isSpeaking = false,
+  userProfiles = new Map()
 }: VideoTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hasAudio = participant.isMicrophoneEnabled;
   const identity = participant.identity;
   const isSip = identity.startsWith('sip-');
 
-  const displayName = isLocal ? 'You' : isSip ? 'Phone Call' : identity;
+  const displayName = isLocal
+    ? 'You'
+    : isSip
+    ? 'Phone Call'
+    : getDisplayName(identity, userProfiles);
 
   let hasVideo = false;
   let videoTrack: RemoteVideoTrack | LocalVideoTrack | undefined;

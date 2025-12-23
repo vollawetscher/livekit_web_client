@@ -1,5 +1,6 @@
 import { Mic, MicOff, Video as VideoIcon, VideoOff, User, UserX, Crown } from 'lucide-react';
 import { RemoteParticipant, LocalParticipant } from 'livekit-client';
+import { UserProfile, getDisplayName } from '../utils/ProfileService';
 
 interface ParticipantTileProps {
   participant: RemoteParticipant | LocalParticipant;
@@ -11,6 +12,7 @@ interface ParticipantTileProps {
   onKickParticipant?: (participantId: string) => void;
   onMuteParticipant?: (participantId: string, muted: boolean) => void;
   onToggleParticipantVideo?: (participantId: string, enabled: boolean) => void;
+  userProfiles?: Map<string, UserProfile>;
 }
 
 export default function ParticipantTile({
@@ -22,14 +24,19 @@ export default function ParticipantTile({
   isCurrentUserAdmin = false,
   onKickParticipant,
   onMuteParticipant,
-  onToggleParticipantVideo
+  onToggleParticipantVideo,
+  userProfiles = new Map()
 }: ParticipantTileProps) {
   const hasAudio = participant.isMicrophoneEnabled;
   const hasVideo = participant.isCameraEnabled;
   const identity = participant.identity;
   const isSip = identity.startsWith('sip-');
 
-  const displayName = isLocal ? 'You' : isSip ? 'Phone Call' : identity;
+  const displayName = isLocal
+    ? 'You'
+    : isSip
+    ? 'Phone Call'
+    : getDisplayName(identity, userProfiles);
 
   const handleKick = () => {
     if (onKickParticipant && !isLocal) {

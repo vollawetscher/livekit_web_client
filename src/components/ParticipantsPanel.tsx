@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Users } from 'lucide-react';
 import { RemoteParticipant, LocalParticipant, Room, RoomEvent } from 'livekit-client';
 import ParticipantTile from './ParticipantTile';
+import { fetchUserProfiles, UserProfile } from '../utils/ProfileService';
 
 interface ParticipantsPanelProps {
   room: Room | null;
@@ -26,6 +27,7 @@ export default function ParticipantsPanel({
 }: ParticipantsPanelProps) {
   const [participants, setParticipants] = useState<(RemoteParticipant | LocalParticipant)[]>([]);
   const [isExpanded, setIsExpanded] = useState(true);
+  const [userProfiles, setUserProfiles] = useState<Map<string, UserProfile>>(new Map());
 
   useEffect(() => {
     if (!room) {
@@ -57,6 +59,24 @@ export default function ParticipantsPanel({
       room.off(RoomEvent.TrackUnmuted, updateParticipants);
     };
   }, [room]);
+
+  useEffect(() => {
+    if (participants.length === 0) {
+      return;
+    }
+
+    const userIds = participants
+      .map(p => p.identity)
+      .filter(id => !id.startsWith('sip-'));
+
+    if (userIds.length === 0) {
+      return;
+    }
+
+    fetchUserProfiles(userIds).then(profiles => {
+      setUserProfiles(profiles);
+    });
+  }, [participants]);
 
   if (!room) {
     return null;
@@ -103,6 +123,7 @@ export default function ParticipantsPanel({
                   onKickParticipant={onKickParticipant}
                   onMuteParticipant={onMuteParticipant}
                   onToggleParticipantVideo={onToggleParticipantVideo}
+                  userProfiles={userProfiles}
                 />
               );
             })
