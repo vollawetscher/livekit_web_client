@@ -261,6 +261,36 @@ export default function VoiceAssistant() {
     }
   };
 
+  const handleMuteParticipant = async (participantId: string, muted: boolean) => {
+    if (!liveKitClientRef.current || userId !== adminUserId) {
+      addLog('Only admin can control participants');
+      return;
+    }
+
+    try {
+      await liveKitClientRef.current.toggleRemoteParticipantAudio(participantId, muted);
+      addLog(`${muted ? 'Muted' : 'Unmuted'} ${participantId}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      addLog(`Mute error: ${errorMessage}`);
+    }
+  };
+
+  const handleToggleParticipantVideo = async (participantId: string, enabled: boolean) => {
+    if (!liveKitClientRef.current || userId !== adminUserId) {
+      addLog('Only admin can control participants');
+      return;
+    }
+
+    try {
+      await liveKitClientRef.current.toggleRemoteParticipantVideo(participantId, enabled);
+      addLog(`${enabled ? 'Enabled' : 'Disabled'} video for ${participantId}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      addLog(`Video toggle error: ${errorMessage}`);
+    }
+  };
+
   const handleProfileUpdate = (profile: UserProfile) => {
     setUserProfile(profile);
     addLog('Profile updated successfully');
@@ -546,6 +576,8 @@ export default function VoiceAssistant() {
                 adminUserId={adminUserId}
                 currentUserId={userId}
                 onKickParticipant={handleKickParticipant}
+                onMuteParticipant={handleMuteParticipant}
+                onToggleParticipantVideo={handleToggleParticipantVideo}
               />
             </div>
           )}

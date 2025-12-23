@@ -9,6 +9,8 @@ interface ParticipantTileProps {
   isAdmin?: boolean;
   isCurrentUserAdmin?: boolean;
   onKickParticipant?: (participantId: string) => void;
+  onMuteParticipant?: (participantId: string, muted: boolean) => void;
+  onToggleParticipantVideo?: (participantId: string, enabled: boolean) => void;
 }
 
 export default function ParticipantTile({
@@ -18,7 +20,9 @@ export default function ParticipantTile({
   audioLevel = 0,
   isAdmin = false,
   isCurrentUserAdmin = false,
-  onKickParticipant
+  onKickParticipant,
+  onMuteParticipant,
+  onToggleParticipantVideo
 }: ParticipantTileProps) {
   const hasAudio = participant.isMicrophoneEnabled;
   const hasVideo = participant.isCameraEnabled;
@@ -30,6 +34,18 @@ export default function ParticipantTile({
   const handleKick = () => {
     if (onKickParticipant && !isLocal) {
       onKickParticipant(identity);
+    }
+  };
+
+  const handleMuteToggle = () => {
+    if (onMuteParticipant && !isLocal) {
+      onMuteParticipant(identity, !hasAudio);
+    }
+  };
+
+  const handleVideoToggle = () => {
+    if (onToggleParticipantVideo && !isLocal) {
+      onToggleParticipantVideo(identity, !hasVideo);
     }
   };
 
@@ -84,13 +100,37 @@ export default function ParticipantTile({
             )}
           </div>
           {isCurrentUserAdmin && !isLocal && !isSip && (
-            <button
-              onClick={handleKick}
-              className="p-1 rounded hover:bg-red-600 transition-colors flex-shrink-0"
-              title="Remove participant"
-            >
-              <UserX className="w-3 h-3 text-red-400 hover:text-white" />
-            </button>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <button
+                onClick={handleMuteToggle}
+                className="p-1 rounded hover:bg-slate-600 transition-colors"
+                title={hasAudio ? 'Mute participant' : 'Unmute participant'}
+              >
+                {hasAudio ? (
+                  <Mic className="w-3 h-3 text-green-400 hover:text-white" />
+                ) : (
+                  <MicOff className="w-3 h-3 text-slate-400 hover:text-white" />
+                )}
+              </button>
+              <button
+                onClick={handleVideoToggle}
+                className="p-1 rounded hover:bg-slate-600 transition-colors"
+                title={hasVideo ? 'Disable participant video' : 'Enable participant video'}
+              >
+                {hasVideo ? (
+                  <VideoIcon className="w-3 h-3 text-blue-400 hover:text-white" />
+                ) : (
+                  <VideoOff className="w-3 h-3 text-slate-400 hover:text-white" />
+                )}
+              </button>
+              <button
+                onClick={handleKick}
+                className="p-1 rounded hover:bg-red-600 transition-colors"
+                title="Remove participant"
+              >
+                <UserX className="w-3 h-3 text-red-400 hover:text-white" />
+              </button>
+            </div>
           )}
 
           <div className="flex items-center gap-2 mt-1">

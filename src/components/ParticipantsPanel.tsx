@@ -10,6 +10,8 @@ interface ParticipantsPanelProps {
   adminUserId?: string;
   currentUserId?: string;
   onKickParticipant?: (participantId: string) => void;
+  onMuteParticipant?: (participantId: string, muted: boolean) => void;
+  onToggleParticipantVideo?: (participantId: string, enabled: boolean) => void;
 }
 
 export default function ParticipantsPanel({
@@ -18,7 +20,9 @@ export default function ParticipantsPanel({
   activeSpeakers,
   adminUserId,
   currentUserId,
-  onKickParticipant
+  onKickParticipant,
+  onMuteParticipant,
+  onToggleParticipantVideo
 }: ParticipantsPanelProps) {
   const [participants, setParticipants] = useState<(RemoteParticipant | LocalParticipant)[]>([]);
   const [isExpanded, setIsExpanded] = useState(true);
@@ -97,6 +101,8 @@ export default function ParticipantsPanel({
                   isAdmin={isAdmin}
                   isCurrentUserAdmin={isCurrentUserAdmin}
                   onKickParticipant={onKickParticipant}
+                  onMuteParticipant={onMuteParticipant}
+                  onToggleParticipantVideo={onToggleParticipantVideo}
                 />
               );
             })

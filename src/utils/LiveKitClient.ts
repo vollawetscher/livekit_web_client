@@ -128,6 +128,8 @@ export class LiveKitClient {
             console.log('✅ Session ID received:', this.sessionId);
             this.onLogMessage(`Session ready: ${this.sessionId}`);
           }
+        } else if (data.event === 'admin-control') {
+          this.handleAdminControl(data);
         }
       } catch (error) {
         console.error('❌ Error parsing data message:', error);
@@ -378,5 +380,63 @@ export class LiveKitClient {
       participants: this.room.numParticipants,
       localTracks: this.room.localParticipant.trackPublications.size,
     });
+  }
+
+  async toggleRemoteParticipantAudio(participantIdentity: string, muted: boolean): Promise<void> {
+    try {
+      console.log(`Sending mute command to ${participantIdentity}: ${muted}`);
+      await this.sendData({
+        event: 'admin-control',
+        action: 'mute-audio',
+        targetParticipant: participantIdentity,
+        muted: muted,
+      });
+      this.onLogMessage(`Sent audio ${muted ? 'mute' : 'unmute'} to ${participantIdentity}`);
+    } catch (error) {
+      console.error('Failed to toggle remote participant audio:', error);
+      throw error;
+    }
+  }
+
+  async toggleRemoteParticipantVideo(participantIdentity: string, enabled: boolean): Promise<void> {
+    try {
+      console.log(`Sending video command to ${participantIdentity}: ${enabled ? 'enable' : 'disable'}`);
+      await this.sendData({
+        event: 'admin-control',
+        action: 'toggle-video',
+        targetParticipant: participantIdentity,
+        enabled: enabled,
+      });
+      this.onLogMessage(`Sent video ${enabled ? 'enable' : 'disable'} to ${participantIdentity}`);
+    } catch (error) {
+      console.error('Failed to toggle remote participant video:', error);
+      throw error;
+    }
+  }
+
+  private async handleAdminControl(data: any): Promise<void> {
+    if (data.targetParticipant !== this.room.localParticipant.identity) {
+      return;
+    }
+
+    console.log('📨 Received admin control:', data);
+
+    if (data.action === 'mute-audio') {
+      if (data.muted && this.localAudioTrack) {
+        await this.localAudioTrack.mute();
+        this.onLogMessage('Admin muted your audio');
+      } else if (!data.muted && this.localAudioTrack) {
+        await this.localAudioTrack.unmute();
+        this.onLogMessage('Admin unmuted your audio');
+      }
+    } else if (data.action === 'toggle-video') {
+      if (!data.enabled && this.localVideoTrack) {
+        await this.unpublishVideo();
+        this.onLogMessage('Admin disabled your video');
+      } else if (data.enabled && !this.localVideoTrack) {
+        await this.publishVideo();
+        this.onLogMessage('Admin enabled your video');
+      }
+    }
   }
 }
