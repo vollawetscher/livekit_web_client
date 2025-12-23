@@ -28,12 +28,16 @@ export default function VideoGrid({ room, activeSpeakers }: VideoGridProps) {
     room.on(RoomEvent.ParticipantDisconnected, updateParticipants);
     room.on(RoomEvent.TrackPublished, updateParticipants);
     room.on(RoomEvent.TrackUnpublished, updateParticipants);
+    room.on(RoomEvent.TrackSubscribed, updateParticipants);
+    room.on(RoomEvent.TrackUnsubscribed, updateParticipants);
 
     return () => {
       room.off(RoomEvent.ParticipantConnected, updateParticipants);
       room.off(RoomEvent.ParticipantDisconnected, updateParticipants);
       room.off(RoomEvent.TrackPublished, updateParticipants);
       room.off(RoomEvent.TrackUnpublished, updateParticipants);
+      room.off(RoomEvent.TrackSubscribed, updateParticipants);
+      room.off(RoomEvent.TrackUnsubscribed, updateParticipants);
     };
   }, [room]);
 

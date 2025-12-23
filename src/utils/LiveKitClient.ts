@@ -195,9 +195,11 @@ export class LiveKitClient {
       console.log('🔌 Connecting to LiveKit:', url);
       this.onLogMessage(`Connecting to ${url}...`);
 
-      await this.room.connect(url, token);
+      await this.room.connect(url, token, {
+        autoSubscribe: true,
+      });
 
-      console.log('✅ Room connected');
+      console.log('✅ Room connected with auto-subscribe enabled');
       this.sessionId = this.room.name || 'default-session';
       this.onLogMessage('Room connected');
 
