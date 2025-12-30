@@ -54,7 +54,7 @@ export class TokenManager {
     }
 
     const tokenUrl = `${supabaseUrl}/functions/v1/generate-livekit-token`;
-    const roomName = import.meta.env.VITE_LIVEKIT_ROOM_NAME || 'voice-assistant-room';
+    const roomName = import.meta.env.VITE_LIVEKIT_ROOM_NAME || `room-${this.userId}`;
 
     const response = await fetch(tokenUrl, {
       method: 'POST',
