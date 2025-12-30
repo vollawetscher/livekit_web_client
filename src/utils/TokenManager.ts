@@ -35,17 +35,21 @@ export class TokenManager {
     return this.tokenExpiry - Date.now() > bufferTime;
   }
 
-  async getToken(): Promise<string> {
+  async getToken(roomName: string): Promise<string> {
+    if (!roomName) {
+      throw new Error('Room name is required');
+    }
+
     if (this.currentToken && this.isTokenValid()) {
       console.log('Using valid cached token');
       return this.currentToken;
     }
 
     console.log('Requesting new token from server');
-    return await this.requestNewToken();
+    return await this.requestNewToken(roomName);
   }
 
-  private async requestNewToken(): Promise<string> {
+  private async requestNewToken(roomName: string): Promise<string> {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -54,7 +58,6 @@ export class TokenManager {
     }
 
     const tokenUrl = `${supabaseUrl}/functions/v1/generate-livekit-token`;
-    const roomName = import.meta.env.VITE_LIVEKIT_ROOM_NAME || `room-${this.userId}`;
 
     const response = await fetch(tokenUrl, {
       method: 'POST',

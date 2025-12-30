@@ -33,6 +33,7 @@ export default function VoiceAssistant() {
   const [userId, setUserId] = useState<string>('');
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [adminUserId, setAdminUserId] = useState<string>('');
+  const [roomName, setRoomName] = useState<string>('');
   const recorderRef = useRef<AudioRecorder | null>(null);
   const liveKitClientRef = useRef<LiveKitClient | null>(null);
   const audioTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -162,8 +163,12 @@ export default function VoiceAssistant() {
     }
 
     try {
+      const generatedRoomName = `call-${userId}-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+      setRoomName(generatedRoomName);
+      addLog(`Creating new room: ${generatedRoomName}`);
+
       addLog('Requesting LiveKit token...');
-      const token = await tokenManagerRef.current.getToken();
+      const token = await tokenManagerRef.current.getToken(generatedRoomName);
       setJwtToken(token);
       addLog('LiveKit token acquired successfully');
 
@@ -250,6 +255,7 @@ export default function VoiceAssistant() {
     setAudioLevels(new Map());
     setActiveSpeakers(new Set());
     setAdminUserId('');
+    setRoomName('');
     addLog('Disconnected');
   };
 
