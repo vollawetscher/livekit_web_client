@@ -248,6 +248,11 @@ export default function VoiceAssistant() {
       ringingAudioRef.current.currentTime = 0;
     }
 
+    if (tokenManagerRef.current) {
+      tokenManagerRef.current.clearToken();
+      addLog('Token cleared for new connection');
+    }
+
     setIsConnected(false);
     setInputLevel(0);
     setIsReceivingAudio(false);

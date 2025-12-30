@@ -3,6 +3,7 @@ export class TokenManager {
   private deviceId: string;
   private currentToken: string | null = null;
   private tokenExpiry: number | null = null;
+  private currentRoomName: string | null = null;
 
   constructor(userId: string = 'web-user', deviceId?: string) {
     this.userId = userId;
@@ -40,12 +41,17 @@ export class TokenManager {
       throw new Error('Room name is required');
     }
 
-    if (this.currentToken && this.isTokenValid()) {
-      console.log('Using valid cached token');
+    if (this.currentToken && this.isTokenValid() && this.currentRoomName === roomName) {
+      console.log('Using valid cached token for same room');
       return this.currentToken;
     }
 
-    console.log('Requesting new token from server');
+    if (this.currentRoomName && this.currentRoomName !== roomName) {
+      console.log('Room name changed, requesting new token');
+    } else {
+      console.log('Requesting new token from server');
+    }
+
     return await this.requestNewToken(roomName);
   }
 
@@ -84,9 +90,10 @@ export class TokenManager {
 
     this.currentToken = data.token;
     this.tokenExpiry = this.parseJwtExpiry(data.token);
+    this.currentRoomName = roomName;
 
     const expiryDate = this.tokenExpiry ? new Date(this.tokenExpiry).toLocaleString() : 'unknown';
-    console.log(`LiveKit token received (expires: ${expiryDate})`);
+    console.log(`LiveKit token received for room ${roomName} (expires: ${expiryDate})`);
 
     return data.token;
   }
@@ -94,6 +101,7 @@ export class TokenManager {
   clearToken(): void {
     this.currentToken = null;
     this.tokenExpiry = null;
+    this.currentRoomName = null;
   }
 
   getTokenExpiry(): Date | null {
