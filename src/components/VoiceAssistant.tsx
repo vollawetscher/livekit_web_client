@@ -39,11 +39,61 @@ export default function VoiceAssistant() {
   const audioTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const tokenManagerRef = useRef<TokenManager | null>(null);
   const currentCallDataRef = useRef<{ phoneNumber: string; contactName: string } | null>(null);
-  const ringingAudioRef = useRef<HTMLAudioElement | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const oscillatorRef = useRef<OscillatorNode | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
 
   const addLog = (message: string) => {
     const timestamp = new Date().toLocaleTimeString();
     setLogs((prev) => [...prev, `[${timestamp}] ${message}`]);
+  };
+
+  const startRingtone = () => {
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioContext();
+      }
+
+      if (oscillatorRef.current) {
+        stopRingtone();
+      }
+
+      const context = audioContextRef.current;
+      const oscillator = context.createOscillator();
+      const gainNode = context.createGain();
+
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(440, context.currentTime);
+      gainNode.gain.setValueAtTime(0.3, context.currentTime);
+
+      oscillator.connect(gainNode);
+      gainNode.connect(context.destination);
+
+      oscillator.start();
+      oscillatorRef.current = oscillator;
+      gainNodeRef.current = gainNode;
+
+      addLog('Ringtone started');
+    } catch (error) {
+      console.error('Failed to start ringtone:', error);
+    }
+  };
+
+  const stopRingtone = () => {
+    try {
+      if (oscillatorRef.current) {
+        oscillatorRef.current.stop();
+        oscillatorRef.current.disconnect();
+        oscillatorRef.current = null;
+      }
+      if (gainNodeRef.current) {
+        gainNodeRef.current.disconnect();
+        gainNodeRef.current = null;
+      }
+      addLog('Ringtone stopped');
+    } catch (error) {
+      console.error('Failed to stop ringtone:', error);
+    }
   };
 
   const handleCallStatus = async (event: CallStatusEvent) => {
@@ -55,23 +105,8 @@ export default function VoiceAssistant() {
       setActiveSipParticipantId(event.sipParticipantId);
     }
 
-    if (event.status === 'ringing') {
-      if (ringingAudioRef.current) {
-        addLog('Playing ringing sound...');
-        ringingAudioRef.current.currentTime = 0;
-        ringingAudioRef.current.play()
-          .then(() => addLog('Ringing sound started'))
-          .catch(err => {
-            console.error('Failed to play ringing sound:', err);
-            addLog(`Ringing sound error: ${err.message}`);
-          });
-      }
-    } else {
-      if (ringingAudioRef.current && !ringingAudioRef.current.paused) {
-        addLog('Stopping ringing sound');
-        ringingAudioRef.current.pause();
-        ringingAudioRef.current.currentTime = 0;
-      }
+    if (event.status === 'answered' || event.status === 'in-progress') {
+      stopRingtone();
     }
 
     const isActive = ['initiated', 'ringing', 'in-progress', 'answered'].includes(event.status);
@@ -79,10 +114,7 @@ export default function VoiceAssistant() {
 
     const isTerminal = ['completed', 'failed', 'busy', 'no-answer'].includes(event.status);
     if (isTerminal) {
-      if (ringingAudioRef.current) {
-        ringingAudioRef.current.pause();
-        ringingAudioRef.current.currentTime = 0;
-      }
+      stopRingtone();
 
       setTimeout(() => {
         setCallStatus(null);
@@ -139,14 +171,11 @@ export default function VoiceAssistant() {
       addLog('Token manager initialized');
     }
 
-    ringingAudioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-    ringingAudioRef.current.loop = true;
-    ringingAudioRef.current.volume = 0.5;
-
     return () => {
-      if (ringingAudioRef.current) {
-        ringingAudioRef.current.pause();
-        ringingAudioRef.current = null;
+      stopRingtone();
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+        audioContextRef.current = null;
       }
     };
   }, []);
@@ -243,10 +272,7 @@ export default function VoiceAssistant() {
       audioTimeoutRef.current = null;
     }
 
-    if (ringingAudioRef.current) {
-      ringingAudioRef.current.pause();
-      ringingAudioRef.current.currentTime = 0;
-    }
+    stopRingtone();
 
     if (tokenManagerRef.current) {
       tokenManagerRef.current.clearToken();
@@ -367,33 +393,13 @@ export default function VoiceAssistant() {
       const dialService = new DialService(supabaseUrl, supabaseKey);
       const result = await dialService.dialContact(phoneNumber, contactName, sessionId);
 
-      setCallStatus('initiated');
+      setCallStatus('ringing');
       setActiveCallId(result.callId);
       setActiveSipParticipantId(result.sipParticipantId);
       addLog(`Call initiated: ${result.callId}`);
       addLog(`SIP Participant: ${result.sipParticipantId}`);
 
-      setTimeout(() => {
-        if (liveKitClientRef.current && isCallActive) {
-          const participants = Array.from(liveKitClientRef.current.getRoom().remoteParticipants.values());
-          const sipParticipant = participants.find(p => p.identity === result.sipParticipantId);
-
-          const hasAudioTrack = sipParticipant?.audioTrackPublications.size ?? 0 > 0;
-
-          if (!hasAudioTrack) {
-            setCallStatus('ringing');
-            addLog('Call is ringing...');
-
-            if (ringingAudioRef.current) {
-              addLog('Starting ringing sound...');
-              ringingAudioRef.current.currentTime = 0;
-              ringingAudioRef.current.play()
-                .then(() => addLog('Ringing sound playing'))
-                .catch(err => addLog(`Ringing sound error: ${err.message}`));
-            }
-          }
-        }
-      }, 1500);
+      startRingtone();
 
       await insertCallHistory({
         phone_number: phoneNumber,
@@ -409,6 +415,7 @@ export default function VoiceAssistant() {
       setCallStatus(`failed`);
       addLog(`Dial error: ${errorMessage}`);
       setIsCallActive(false);
+      stopRingtone();
 
       if (currentCallDataRef.current) {
         await insertCallHistory({
@@ -436,11 +443,7 @@ export default function VoiceAssistant() {
 
     try {
       addLog('Ending call...');
-
-      if (ringingAudioRef.current) {
-        ringingAudioRef.current.pause();
-        ringingAudioRef.current.currentTime = 0;
-      }
+      stopRingtone();
 
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
