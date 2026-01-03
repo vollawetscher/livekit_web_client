@@ -151,9 +151,11 @@ export class LiveKitClient {
     });
 
     this.room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
-      console.log('👤 Participant connected:', participant.identity);
+      console.log('👤 Participant connected:', participant.identity, 'metadata:', participant.metadata);
+      this.onLogMessage(`Participant joined: ${participant.identity}`);
       if (participant.identity.startsWith('sip-')) {
-        this.onLogMessage(`SIP participant joined room: ${participant.identity}`);
+        this.onLogMessage(`🔔 SIP participant connected (call may be ringing)`);
+        console.log('SIP participant metadata:', participant.metadata);
       }
     });
 
@@ -180,13 +182,17 @@ export class LiveKitClient {
     });
 
     this.room.on(RoomEvent.TrackPublished, (publication, participant: RemoteParticipant) => {
-      console.log('📢 Track published:', publication.kind, 'by', participant.identity);
+      console.log('📢 Track published:', publication.kind, 'by', participant.identity, 'at', new Date().toISOString());
 
       if (participant.identity.startsWith('sip-') && publication.kind === Track.Kind.Audio) {
-        this.onLogMessage(`Call answered - audio track detected`);
+        this.onLogMessage(`✅ Call answered - SIP audio track published`);
+        console.log('🎵 SIP audio track published, triggering answered status');
 
         const metadata = participant.metadata ? JSON.parse(participant.metadata) : {};
+        console.log('SIP participant metadata:', metadata);
+
         if (metadata.callId && metadata.phoneNumber) {
+          console.log('Calling onCallStatus with answered status');
           if (this.onCallStatus) {
             this.onCallStatus({
               event: 'call-status',
@@ -197,6 +203,8 @@ export class LiveKitClient {
               sipParticipantId: participant.identity,
             });
           }
+        } else {
+          console.warn('Missing callId or phoneNumber in SIP participant metadata');
         }
       }
     });
