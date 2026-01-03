@@ -30,6 +30,7 @@ export class LiveKitClient {
   private onLogMessage: (msg: string) => void;
   private onAudioReceived?: () => void;
   private onCallStatus?: (event: CallStatusEvent) => void;
+  private onStopRingtone?: () => void;
   private isConnected = false;
   private sessionId: string = '';
   private localAudioTrack: LocalAudioTrack | null = null;
@@ -38,12 +39,14 @@ export class LiveKitClient {
   constructor(
     onLogMessage: (msg: string) => void,
     onAudioReceived?: () => void,
-    onCallStatus?: (event: CallStatusEvent) => void
+    onCallStatus?: (event: CallStatusEvent) => void,
+    onStopRingtone?: () => void
   ) {
     this.room = new Room();
     this.onLogMessage = onLogMessage;
     this.onAudioReceived = onAudioReceived;
     this.onCallStatus = onCallStatus;
+    this.onStopRingtone = onStopRingtone;
 
     this.setupRoomListeners();
   }
@@ -83,6 +86,13 @@ export class LiveKitClient {
         const audioElement = (track as RemoteAudioTrack).attach();
         document.body.appendChild(audioElement);
         audioElement.play();
+
+        if (participant.identity.startsWith('sip-')) {
+          console.log('📞 SIP participant audio connected - stopping ringtone');
+          if (this.onStopRingtone) {
+            this.onStopRingtone();
+          }
+        }
 
         if (this.onAudioReceived) {
           this.onAudioReceived();

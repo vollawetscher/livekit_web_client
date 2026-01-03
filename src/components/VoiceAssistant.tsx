@@ -42,6 +42,7 @@ export default function VoiceAssistant() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const oscillatorRef = useRef<OscillatorNode | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
+  const ringtoneIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const addLog = (message: string) => {
     const timestamp = new Date().toLocaleTimeString();
@@ -59,21 +60,32 @@ export default function VoiceAssistant() {
       }
 
       const context = audioContextRef.current;
-      const oscillator = context.createOscillator();
-      const gainNode = context.createGain();
 
-      oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(440, context.currentTime);
-      gainNode.gain.setValueAtTime(0.3, context.currentTime);
+      const playTone = () => {
+        const oscillator = context.createOscillator();
+        const gainNode = context.createGain();
 
-      oscillator.connect(gainNode);
-      gainNode.connect(context.destination);
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(425, context.currentTime);
+        gainNode.gain.setValueAtTime(0.2, context.currentTime);
 
-      oscillator.start();
-      oscillatorRef.current = oscillator;
-      gainNodeRef.current = gainNode;
+        oscillator.connect(gainNode);
+        gainNode.connect(context.destination);
 
-      addLog('Ringtone started');
+        oscillator.start();
+        oscillator.stop(context.currentTime + 1);
+
+        oscillatorRef.current = oscillator;
+        gainNodeRef.current = gainNode;
+      };
+
+      playTone();
+
+      ringtoneIntervalRef.current = setInterval(() => {
+        playTone();
+      }, 5000);
+
+      addLog('Ringtone started (ETSI standard)');
     } catch (error) {
       console.error('Failed to start ringtone:', error);
     }
@@ -81,9 +93,16 @@ export default function VoiceAssistant() {
 
   const stopRingtone = () => {
     try {
+      if (ringtoneIntervalRef.current) {
+        clearInterval(ringtoneIntervalRef.current);
+        ringtoneIntervalRef.current = null;
+      }
       if (oscillatorRef.current) {
-        oscillatorRef.current.stop();
-        oscillatorRef.current.disconnect();
+        try {
+          oscillatorRef.current.stop();
+          oscillatorRef.current.disconnect();
+        } catch (e) {
+        }
         oscillatorRef.current = null;
       }
       if (gainNodeRef.current) {
@@ -218,7 +237,8 @@ export default function VoiceAssistant() {
           if (audioTimeoutRef.current) clearTimeout(audioTimeoutRef.current);
           audioTimeoutRef.current = setTimeout(() => setIsReceivingAudio(false), 200);
         },
-        handleCallStatus
+        handleCallStatus,
+        stopRingtone
       );
 
       await liveKitClientRef.current.connect(liveKitUrl, token);
