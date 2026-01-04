@@ -23,8 +23,8 @@ export class CallInvitationService {
         filter: `callee_user_id=eq.${this.userId}`,
       }, (payload) => {
         this.onInvitationCallbacks.forEach(callback => callback(payload.new as CallInvitation));
-      })
-      .subscribe();
+      });
+    await this.incomingChannel.subscribe();
 
     this.outgoingChannel = supabase
       .channel('outgoing_invitations')
@@ -35,8 +35,8 @@ export class CallInvitationService {
         filter: `caller_user_id=eq.${this.userId}`,
       }, (payload) => {
         this.onInvitationCallbacks.forEach(callback => callback(payload.new as CallInvitation));
-      })
-      .subscribe();
+      });
+    await this.outgoingChannel.subscribe();
   }
 
   async stop() {
