@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Users, Phone, Bell, BellOff, LogOut } from 'lucide-react';
+import { Room } from 'livekit-client';
 import { useAuth } from './contexts/AuthContext';
 import AuthScreen from './components/AuthScreen';
 import VoiceAssistant from './components/VoiceAssistant';
@@ -21,6 +22,7 @@ function MainApp() {
   const [isInCall, setIsInCall] = useState(false);
   const [callRoomName, setCallRoomName] = useState<string | null>(null);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+  const [livekitRoom, setLivekitRoom] = useState<Room | null>(null);
 
   const presenceManagerRef = useRef<PresenceManager | null>(null);
   const notificationManagerRef = useRef<NotificationManager | null>(null);
@@ -78,6 +80,7 @@ function MainApp() {
           setOutgoingCalleeId(null);
           liveKitClientRef.current?.disconnect();
           liveKitClientRef.current = null;
+          setLivekitRoom(null);
           presenceManagerRef.current?.setInCall(false);
         }
       }
@@ -131,6 +134,10 @@ function MainApp() {
       await liveKitClientRef.current.connect(livekitUrl, result.token);
       console.log('handleAcceptCall: Successfully connected to LiveKit');
 
+      const room = liveKitClientRef.current.getRoom();
+      setLivekitRoom(room);
+      console.log('handleAcceptCall: Room set in state');
+
       console.log('handleAcceptCall: Publishing audio...');
       await liveKitClientRef.current.publishAudio({
         echoCancellation: true,
@@ -157,6 +164,7 @@ function MainApp() {
 
       setIncomingInvitation(null);
       setIsInCall(false);
+      setLivekitRoom(null);
       await presenceManagerRef.current?.setInCall(false);
 
       if (liveKitClientRef.current) {
@@ -187,6 +195,7 @@ function MainApp() {
 
       liveKitClientRef.current?.disconnect();
       liveKitClientRef.current = null;
+      setLivekitRoom(null);
       await presenceManagerRef.current?.setInCall(false);
     } catch (error) {
       console.error('Failed to cancel call:', error);
@@ -196,6 +205,7 @@ function MainApp() {
   const handleEndCall = async () => {
     liveKitClientRef.current?.disconnect();
     liveKitClientRef.current = null;
+    setLivekitRoom(null);
 
     setIsInCall(false);
     setCallRoomName(null);
@@ -245,6 +255,10 @@ function MainApp() {
       await liveKitClientRef.current.connect(livekitUrl, caller_token);
       console.log('handleCallInitiated: Successfully connected to LiveKit');
 
+      const room = liveKitClientRef.current.getRoom();
+      setLivekitRoom(room);
+      console.log('handleCallInitiated: Room set in state');
+
       console.log('handleCallInitiated: Publishing audio...');
       await liveKitClientRef.current.publishAudio({
         echoCancellation: true,
@@ -270,6 +284,7 @@ function MainApp() {
       setOutgoingInvitation(null);
       setOutgoingCalleeId(null);
       setCallRoomName(null);
+      setLivekitRoom(null);
       await presenceManagerRef.current?.setInCall(false);
 
       if (liveKitClientRef.current) {
@@ -394,7 +409,7 @@ function MainApp() {
 
               <div className="bg-slate-900 rounded-lg p-4 min-h-[400px]">
                 <VideoGrid
-                  room={liveKitClientRef.current?.getRoom() || null}
+                  room={livekitRoom}
                   activeSpeakers={new Set()}
                 />
               </div>
