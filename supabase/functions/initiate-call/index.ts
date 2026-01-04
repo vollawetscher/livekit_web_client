@@ -46,17 +46,14 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Generate unique room name
     const room_name = `call-${crypto.randomUUID()}`;
 
-    // Get callee profile for display name
     const { data: calleeProfile } = await supabase
       .from('user_profiles')
       .select('display_name')
       .eq('user_id', callee_user_id)
       .maybeSingle();
 
-    // Generate LiveKit tokens for both participants immediately
     const callerToken = new AccessToken(livekitApiKey, livekitApiSecret, {
       identity: caller_user_id,
       name: caller_display_name || caller_user_id,
@@ -82,7 +79,6 @@ Deno.serve(async (req: Request) => {
     const callerJwt = await callerToken.toJwt();
     const calleeJwt = await calleeToken.toJwt();
 
-    // Create call invitation with tokens
     const { data: invitation, error: inviteError } = await supabase
       .from('call_invitations')
       .insert({
@@ -104,7 +100,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Check if callee is online
     const { data: presence } = await supabase
       .from('user_presence')
       .select('status, last_seen_at')
@@ -115,7 +110,6 @@ Deno.serve(async (req: Request) => {
       presence.status === 'online' && 
       new Date(presence.last_seen_at).getTime() > Date.now() - 60000;
 
-    // If callee is offline, send push notification
     if (!isOnline) {
       try {
         const pushResponse = await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {

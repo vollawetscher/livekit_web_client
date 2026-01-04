@@ -31,7 +31,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Get the invitation to verify the user is involved
     const { data: invitation, error: inviteError } = await supabase
       .from('call_invitations')
       .select('*')
@@ -45,7 +44,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Verify user is caller or callee
     if (invitation.caller_user_id !== user_id && invitation.callee_user_id !== user_id) {
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
@@ -53,7 +51,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Only update if still pending or accepted (not already ended)
     if (!['pending', 'accepted'].includes(invitation.status)) {
       return new Response(
         JSON.stringify({ success: true, message: 'Invitation already ended' }),
@@ -61,13 +58,11 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Determine final status based on who is rejecting
     let finalStatus = reason;
     if (user_id === invitation.caller_user_id && reason === 'rejected') {
       finalStatus = 'cancelled';
     }
 
-    // Update invitation status
     const { error: updateError } = await supabase
       .from('call_invitations')
       .update({
@@ -84,7 +79,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Update call session if it exists
     await supabase
       .from('call_sessions')
       .update({ status: 'ended', ended_at: new Date().toISOString() })

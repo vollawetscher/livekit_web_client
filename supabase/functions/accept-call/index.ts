@@ -29,7 +29,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Get the invitation
     const { data: invitation, error: inviteError } = await supabase
       .from('call_invitations')
       .select('*')
@@ -45,7 +44,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Check if invitation expired
     if (new Date(invitation.expires_at) < new Date()) {
       await supabase
         .from('call_invitations')
@@ -58,7 +56,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Tokens already exist from initiate-call, just update status
     const { error: updateError } = await supabase
       .from('call_invitations')
       .update({
@@ -75,7 +72,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Create call session
     const { data: session, error: sessionError } = await supabase
       .from('call_sessions')
       .insert({
