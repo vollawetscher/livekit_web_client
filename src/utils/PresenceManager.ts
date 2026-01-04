@@ -11,10 +11,15 @@ export class PresenceManager {
   }
 
   async start() {
+    console.log('PresenceManager: Starting for user:', this.userId);
     await this.updateStatus('online');
+    console.log('PresenceManager: Initial status set to online');
     this.startHeartbeat();
+    console.log('PresenceManager: Heartbeat started');
     await this.subscribeToPresenceUpdates();
+    console.log('PresenceManager: Subscribed to presence updates');
     this.setupVisibilityHandlers();
+    console.log('PresenceManager: Visibility handlers setup complete');
   }
 
   async stop() {
@@ -28,15 +33,17 @@ export class PresenceManager {
 
   private async updateStatus(status: UserPresence['status']) {
     try {
-      await upsertUserPresence({
+      console.log('PresenceManager: Updating status to:', status);
+      const result = await upsertUserPresence({
         user_id: this.userId,
         status,
         metadata: {
           browser: navigator.userAgent,
         },
       });
+      console.log('PresenceManager: Status updated successfully:', result);
     } catch (error) {
-      console.error('Failed to update presence:', error);
+      console.error('PresenceManager: Failed to update presence:', error);
     }
   }
 

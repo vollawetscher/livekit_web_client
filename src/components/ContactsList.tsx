@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Phone, User, Video } from 'lucide-react';
-import { getAllUsers, getUserPresence, UserProfile, UserPresence } from '../utils/supabase';
+import { getAllUsers, getUserPresence, subscribeToPresence, UserProfile, UserPresence } from '../utils/supabase';
 import { CallInvitationService } from '../utils/CallInvitationService';
 
 interface ContactsListProps {
@@ -17,6 +17,21 @@ export default function ContactsList({ currentUserId, callInvitationService, onC
 
   useEffect(() => {
     loadContacts();
+
+    const channel = subscribeToPresence((presence) => {
+      console.log('Presence update received:', presence);
+      setPresenceMap(prev => {
+        const updated = new Map(prev);
+        updated.set(presence.user_id, presence);
+        return updated;
+      });
+    });
+
+    return () => {
+      if (channel) {
+        channel.unsubscribe();
+      }
+    };
   }, []);
 
   const loadContacts = async () => {
@@ -45,16 +60,24 @@ export default function ContactsList({ currentUserId, callInvitationService, onC
   };
 
   const handleCall = async (contact: UserProfile) => {
-    if (callingUserId) return;
+    console.log('handleCall started for contact:', contact.user_id);
+    if (callingUserId) {
+      console.log('Already calling someone:', callingUserId);
+      return;
+    }
 
     setCallingUserId(contact.user_id);
+    console.log('Set callingUserId to:', contact.user_id);
     try {
-      await callInvitationService.initiateCall(contact.user_id);
+      console.log('Calling initiateCall...');
+      const invitation = await callInvitationService.initiateCall(contact.user_id);
+      console.log('initiateCall succeeded, invitation:', invitation);
+      console.log('Calling onCallInitiated callback...');
       onCallInitiated?.(contact.user_id);
+      console.log('handleCall completed successfully');
     } catch (error) {
       console.error('Failed to initiate call:', error);
       alert('Failed to initiate call. Please try again.');
-    } finally {
       setCallingUserId(null);
     }
   };

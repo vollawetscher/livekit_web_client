@@ -51,27 +51,47 @@ export class CallInvitationService {
   }
 
   async initiateCall(calleeUserId: string): Promise<CallInvitation> {
+    console.log('initiateCall: Starting for callee:', calleeUserId);
+    console.log('initiateCall: Getting caller profile for:', this.userId);
     const callerProfile = await getUserProfile(this.userId);
+    console.log('initiateCall: Caller profile:', callerProfile);
 
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/initiate-call`, {
+    const url = `${SUPABASE_URL}/functions/v1/initiate-call`;
+    console.log('initiateCall: Fetching URL:', url);
+
+    const payload = {
+      caller_user_id: this.userId,
+      callee_user_id: calleeUserId,
+      caller_display_name: callerProfile?.display_name || this.userId,
+    };
+    console.log('initiateCall: Request payload:', payload);
+
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
       },
-      body: JSON.stringify({
-        caller_user_id: this.userId,
-        callee_user_id: calleeUserId,
-        caller_display_name: callerProfile?.display_name || this.userId,
-      }),
+      body: JSON.stringify(payload),
     });
 
+    console.log('initiateCall: Response status:', response.status);
+    console.log('initiateCall: Response ok:', response.ok);
+
     if (!response.ok) {
-      const error = await response.json();
+      const errorText = await response.text();
+      console.error('initiateCall: Error response:', errorText);
+      let error;
+      try {
+        error = JSON.parse(errorText);
+      } catch (e) {
+        error = { error: errorText };
+      }
       throw new Error(error.error || 'Failed to initiate call');
     }
 
     const data = await response.json();
+    console.log('initiateCall: Success, invitation:', data.invitation);
     return data.invitation;
   }
 
