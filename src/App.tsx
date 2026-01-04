@@ -100,8 +100,12 @@ function MainApp() {
   const handleAcceptCall = async () => {
     if (!incomingInvitation || !callInvitationServiceRef.current) return;
 
+    console.log('handleAcceptCall: Starting to accept call:', incomingInvitation.id);
+
     try {
+      console.log('handleAcceptCall: Calling acceptCall API...');
       const result = await callInvitationServiceRef.current.acceptCall(incomingInvitation.id);
+      console.log('handleAcceptCall: Got result:', { room_name: result.room_name, hasToken: !!result.token });
 
       setCallRoomName(result.room_name);
       setIncomingInvitation(null);
@@ -110,28 +114,55 @@ function MainApp() {
       await presenceManagerRef.current?.setInCall(true);
 
       const livekitUrl = import.meta.env.VITE_LIVEKIT_URL;
+      console.log('handleAcceptCall: LiveKit URL:', livekitUrl);
       if (!livekitUrl) {
         throw new Error('LiveKit URL not configured');
       }
 
+      console.log('handleAcceptCall: Creating LiveKit client...');
       liveKitClientRef.current = new LiveKitClient(
-        (msg) => console.log(msg),
+        (msg) => console.log('[LiveKit]', msg),
         () => {},
         () => {},
         () => {}
       );
 
+      console.log('handleAcceptCall: Connecting to LiveKit...');
       await liveKitClientRef.current.connect(livekitUrl, result.token);
+      console.log('handleAcceptCall: Successfully connected to LiveKit');
+
+      console.log('handleAcceptCall: Publishing audio...');
       await liveKitClientRef.current.publishAudio({
         echoCancellation: true,
         noiseSuppression: true,
         autoGainControl: true,
       });
-      await liveKitClientRef.current.publishVideo();
+      console.log('handleAcceptCall: Audio published successfully');
+
+      try {
+        console.log('handleAcceptCall: Publishing video...');
+        await liveKitClientRef.current.publishVideo();
+        console.log('handleAcceptCall: Video published successfully');
+      } catch (videoError) {
+        console.warn('handleAcceptCall: Failed to publish video (continuing with audio-only):', videoError);
+      }
+
+      console.log('handleAcceptCall: Call setup complete!');
     } catch (error) {
-      console.error('Failed to accept call:', error);
-      alert('Failed to join call. Please try again.');
+      console.error('handleAcceptCall: Failed to accept call:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('handleAcceptCall: Error details:', errorMessage);
+
+      alert(`Failed to join call: ${errorMessage}\n\nPlease check:\n- Microphone permissions\n- Network connection\n- Browser compatibility`);
+
       setIncomingInvitation(null);
+      setIsInCall(false);
+      await presenceManagerRef.current?.setInCall(false);
+
+      if (liveKitClientRef.current) {
+        liveKitClientRef.current.disconnect();
+        liveKitClientRef.current = null;
+      }
     }
   };
 
@@ -182,52 +213,71 @@ function MainApp() {
   const handleCallInitiated = async (calleeUserId: string) => {
     if (!callInvitationServiceRef.current) return;
 
-    console.log('App.handleCallInitiated: Starting call to:', calleeUserId);
+    console.log('handleCallInitiated: Starting call to:', calleeUserId);
     setOutgoingCalleeId(calleeUserId);
 
     try {
-      console.log('App.handleCallInitiated: Calling initiateCall...');
+      console.log('handleCallInitiated: Calling initiateCall...');
       const { invitation, caller_token, room_name } = await callInvitationServiceRef.current.initiateCall(calleeUserId);
-      console.log('App.handleCallInitiated: Got invitation:', invitation);
-      console.log('App.handleCallInitiated: Got token and room:', { caller_token, room_name });
+      console.log('handleCallInitiated: Got invitation:', invitation);
+      console.log('handleCallInitiated: Got token and room:', { caller_token, room_name });
       setOutgoingInvitation(invitation);
       setCallRoomName(room_name);
 
-      console.log('App.handleCallInitiated: Setting in-call status...');
+      console.log('handleCallInitiated: Setting in-call status...');
       await presenceManagerRef.current?.setInCall(true);
 
       const livekitUrl = import.meta.env.VITE_LIVEKIT_URL;
-      console.log('App.handleCallInitiated: LiveKit URL:', livekitUrl);
+      console.log('handleCallInitiated: LiveKit URL:', livekitUrl);
       if (!livekitUrl) {
         throw new Error('LiveKit URL not configured');
       }
 
-      console.log('App.handleCallInitiated: Creating LiveKit client...');
+      console.log('handleCallInitiated: Creating LiveKit client...');
       liveKitClientRef.current = new LiveKitClient(
-        (msg) => console.log(msg),
+        (msg) => console.log('[LiveKit]', msg),
         () => {},
         () => {},
         () => {}
       );
 
-      console.log('App.handleCallInitiated: Connecting to LiveKit with room:', room_name);
+      console.log('handleCallInitiated: Connecting to LiveKit with room:', room_name);
       await liveKitClientRef.current.connect(livekitUrl, caller_token);
-      console.log('App.handleCallInitiated: Publishing audio...');
+      console.log('handleCallInitiated: Successfully connected to LiveKit');
+
+      console.log('handleCallInitiated: Publishing audio...');
       await liveKitClientRef.current.publishAudio({
         echoCancellation: true,
         noiseSuppression: true,
         autoGainControl: true,
       });
-      console.log('App.handleCallInitiated: Publishing video...');
-      await liveKitClientRef.current.publishVideo();
-      console.log('App.handleCallInitiated: Call setup complete! Waiting in room for callee...');
+      console.log('handleCallInitiated: Audio published successfully');
+
+      try {
+        console.log('handleCallInitiated: Publishing video...');
+        await liveKitClientRef.current.publishVideo();
+        console.log('handleCallInitiated: Video published successfully');
+      } catch (videoError) {
+        console.warn('handleCallInitiated: Failed to publish video (continuing with audio-only):', videoError);
+      }
+
+      console.log('handleCallInitiated: Call setup complete! Waiting in room for callee...');
     } catch (error) {
-      console.error('App.handleCallInitiated: Failed to initiate call:', error);
+      console.error('handleCallInitiated: Failed to initiate call:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('handleCallInitiated: Error details:', errorMessage);
+
       setOutgoingInvitation(null);
       setOutgoingCalleeId(null);
       setCallRoomName(null);
       await presenceManagerRef.current?.setInCall(false);
-      alert('Failed to initiate call. Please try again.');
+
+      if (liveKitClientRef.current) {
+        liveKitClientRef.current.disconnect();
+        liveKitClientRef.current = null;
+      }
+
+      alert(`Failed to initiate call: ${errorMessage}\n\nPlease check:\n- Microphone permissions\n- Network connection\n- Browser compatibility`);
     }
   };
 

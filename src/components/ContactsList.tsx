@@ -18,18 +18,24 @@ export default function ContactsList({ currentUserId, callInvitationService, onC
   useEffect(() => {
     loadContacts();
 
-    const channel = subscribeToPresence((presence) => {
-      console.log('Presence update received:', presence);
-      setPresenceMap(prev => {
-        const updated = new Map(prev);
-        updated.set(presence.user_id, presence);
-        return updated;
+    let channelSubscription: any = null;
+
+    const setupSubscription = async () => {
+      channelSubscription = await subscribeToPresence((presence) => {
+        console.log('Presence update received:', presence);
+        setPresenceMap(prev => {
+          const updated = new Map(prev);
+          updated.set(presence.user_id, presence);
+          return updated;
+        });
       });
-    });
+    };
+
+    setupSubscription();
 
     return () => {
-      if (channel) {
-        channel.unsubscribe();
+      if (channelSubscription && typeof channelSubscription.unsubscribe === 'function') {
+        channelSubscription.unsubscribe();
       }
     };
   }, []);
