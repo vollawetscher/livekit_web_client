@@ -174,7 +174,7 @@ export async function upsertUserPresence(presence: Partial<UserPresence> & { use
 }
 
 export async function subscribeToPresence(callback: (presence: UserPresence) => void) {
-  return supabase
+  const channel = supabase
     .channel('user_presence_changes')
     .on('postgres_changes', {
       event: '*',
@@ -182,12 +182,14 @@ export async function subscribeToPresence(callback: (presence: UserPresence) => 
       table: 'user_presence',
     }, (payload) => {
       callback(payload.new as UserPresence);
-    })
-    .subscribe();
+    });
+
+  await channel.subscribe();
+  return channel;
 }
 
 export async function subscribeToCallInvitations(userId: string, callback: (invitation: CallInvitation) => void) {
-  return supabase
+  const channel = supabase
     .channel('call_invitations_changes')
     .on('postgres_changes', {
       event: '*',
@@ -196,8 +198,10 @@ export async function subscribeToCallInvitations(userId: string, callback: (invi
       filter: `callee_user_id=eq.${userId}`,
     }, (payload) => {
       callback(payload.new as CallInvitation);
-    })
-    .subscribe();
+    });
+
+  await channel.subscribe();
+  return channel;
 }
 
 export async function savePushSubscription(subscription: PushSubscription): Promise<PushSubscription> {
