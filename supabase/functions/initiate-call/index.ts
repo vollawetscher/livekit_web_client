@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { AccessToken } from 'npm:livekit-server-sdk@2.6.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,6 +21,13 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const livekitApiKey = Deno.env.get('LIVEKIT_API_KEY')!;
+    const livekitApiSecret = Deno.env.get('LIVEKIT_API_SECRET')!;
+
+    if (!livekitApiKey || !livekitApiSecret) {
+      throw new Error('LiveKit credentials not configured');
+    }
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { caller_user_id, callee_user_id, caller_display_name }: InitiateCallRequest = await req.json();
@@ -41,13 +49,48 @@ Deno.serve(async (req: Request) => {
     // Generate unique room name
     const room_name = `call-${crypto.randomUUID()}`;
 
-    // Create call invitation
+    // Get callee profile for display name
+    const { data: calleeProfile } = await supabase
+      .from('user_profiles')
+      .select('display_name')
+      .eq('user_id', callee_user_id)
+      .maybeSingle();
+
+    // Generate LiveKit tokens for both participants immediately
+    const callerToken = new AccessToken(livekitApiKey, livekitApiSecret, {
+      identity: caller_user_id,
+      name: caller_display_name || caller_user_id,
+    });
+    callerToken.addGrant({
+      roomJoin: true,
+      room: room_name,
+      canPublish: true,
+      canSubscribe: true,
+    });
+
+    const calleeToken = new AccessToken(livekitApiKey, livekitApiSecret, {
+      identity: callee_user_id,
+      name: calleeProfile?.display_name || callee_user_id,
+    });
+    calleeToken.addGrant({
+      roomJoin: true,
+      room: room_name,
+      canPublish: true,
+      canSubscribe: true,
+    });
+
+    const callerJwt = await callerToken.toJwt();
+    const calleeJwt = await calleeToken.toJwt();
+
+    // Create call invitation with tokens
     const { data: invitation, error: inviteError } = await supabase
       .from('call_invitations')
       .insert({
         caller_user_id,
         callee_user_id,
         room_name,
+        caller_token: callerJwt,
+        callee_token: calleeJwt,
         status: 'pending',
       })
       .select()

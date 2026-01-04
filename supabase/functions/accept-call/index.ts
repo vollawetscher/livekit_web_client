@@ -1,5 +1,4 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { AccessToken } from 'npm:livekit-server-sdk@2.6.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,13 +19,6 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const livekitApiKey = Deno.env.get('LIVEKIT_API_KEY')!;
-    const livekitApiSecret = Deno.env.get('LIVEKIT_API_SECRET')!;
-
-    if (!livekitApiKey || !livekitApiSecret) {
-      throw new Error('LiveKit credentials not configured');
-    }
-
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const { invitation_id, callee_user_id }: AcceptCallRequest = await req.json();
 
@@ -66,52 +58,11 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Get caller and callee profiles for display names
-    const { data: callerProfile } = await supabase
-      .from('user_profiles')
-      .select('display_name')
-      .eq('user_id', invitation.caller_user_id)
-      .maybeSingle();
-
-    const { data: calleeProfile } = await supabase
-      .from('user_profiles')
-      .select('display_name')
-      .eq('user_id', callee_user_id)
-      .maybeSingle();
-
-    // Generate LiveKit tokens for both participants
-    const callerToken = new AccessToken(livekitApiKey, livekitApiSecret, {
-      identity: invitation.caller_user_id,
-      name: callerProfile?.display_name || invitation.caller_user_id,
-    });
-    callerToken.addGrant({
-      roomJoin: true,
-      room: invitation.room_name,
-      canPublish: true,
-      canSubscribe: true,
-    });
-
-    const calleeToken = new AccessToken(livekitApiKey, livekitApiSecret, {
-      identity: callee_user_id,
-      name: calleeProfile?.display_name || callee_user_id,
-    });
-    calleeToken.addGrant({
-      roomJoin: true,
-      room: invitation.room_name,
-      canPublish: true,
-      canSubscribe: true,
-    });
-
-    const callerJwt = await callerToken.toJwt();
-    const calleeJwt = await calleeToken.toJwt();
-
-    // Update invitation with tokens and status
+    // Tokens already exist from initiate-call, just update status
     const { error: updateError } = await supabase
       .from('call_invitations')
       .update({
         status: 'accepted',
-        caller_token: callerJwt,
-        callee_token: calleeJwt,
         accepted_at: new Date().toISOString(),
       })
       .eq('id', invitation_id);
@@ -145,8 +96,8 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({
         success: true,
         room_name: invitation.room_name,
-        caller_token: callerJwt,
-        callee_token: calleeJwt,
+        caller_token: invitation.caller_token,
+        callee_token: invitation.callee_token,
         session_id: session?.id,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -74,6 +74,9 @@ function MainApp() {
 
         if (invitation.status === 'rejected' || invitation.status === 'cancelled' || invitation.status === 'missed') {
           setOutgoingInvitation(null);
+          liveKitClientRef.current?.disconnect();
+          liveKitClientRef.current = null;
+          presenceManagerRef.current?.setInCall(false);
         }
       }
     });
@@ -86,43 +89,9 @@ function MainApp() {
   };
 
   const handleOutgoingCallAccepted = async (invitation: CallInvitation) => {
-    if (!invitation.caller_token || !invitation.room_name) {
-      console.error('Missing token or room name in accepted invitation');
-      return;
-    }
-
-    try {
-      setOutgoingInvitation(null);
-      setIsInCall(true);
-      setCallRoomName(invitation.room_name);
-
-      await presenceManagerRef.current?.setInCall(true);
-
-      const livekitUrl = import.meta.env.VITE_LIVEKIT_URL;
-      if (!livekitUrl) {
-        throw new Error('LiveKit URL not configured');
-      }
-
-      liveKitClientRef.current = new LiveKitClient(
-        (msg) => console.log(msg),
-        () => {},
-        () => {},
-        () => {}
-      );
-
-      await liveKitClientRef.current.connect(livekitUrl, invitation.caller_token);
-      await liveKitClientRef.current.publishAudio({
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      });
-      await liveKitClientRef.current.publishVideo();
-    } catch (error) {
-      console.error('Failed to join call as caller:', error);
-      alert('Failed to join call. Please try again.');
-      setIsInCall(false);
-      setOutgoingInvitation(null);
-    }
+    setOutgoingInvitation(null);
+    setIsInCall(true);
+    setCallRoomName(invitation.room_name);
   };
 
   const handleAcceptCall = async () => {
@@ -180,6 +149,10 @@ function MainApp() {
     try {
       await callInvitationServiceRef.current.cancelCall(outgoingInvitation.id);
       setOutgoingInvitation(null);
+
+      liveKitClientRef.current?.disconnect();
+      liveKitClientRef.current = null;
+      await presenceManagerRef.current?.setInCall(false);
     } catch (error) {
       console.error('Failed to cancel call:', error);
     }
@@ -208,8 +181,37 @@ function MainApp() {
     try {
       const invitation = await callInvitationServiceRef.current.initiateCall(calleeUserId);
       setOutgoingInvitation(invitation);
+
+      if (!invitation.caller_token || !invitation.room_name) {
+        console.error('Missing token or room name in invitation');
+        return;
+      }
+
+      await presenceManagerRef.current?.setInCall(true);
+
+      const livekitUrl = import.meta.env.VITE_LIVEKIT_URL;
+      if (!livekitUrl) {
+        throw new Error('LiveKit URL not configured');
+      }
+
+      liveKitClientRef.current = new LiveKitClient(
+        (msg) => console.log(msg),
+        () => {},
+        () => {},
+        () => {}
+      );
+
+      await liveKitClientRef.current.connect(livekitUrl, invitation.caller_token);
+      await liveKitClientRef.current.publishAudio({
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      });
+      await liveKitClientRef.current.publishVideo();
     } catch (error) {
       console.error('Failed to initiate call:', error);
+      setOutgoingInvitation(null);
+      await presenceManagerRef.current?.setInCall(false);
     }
   };
 
