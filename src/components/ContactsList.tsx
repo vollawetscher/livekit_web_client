@@ -7,13 +7,13 @@ interface ContactsListProps {
   currentUserId: string;
   callInvitationService: CallInvitationService;
   onCallInitiated?: (calleeUserId: string) => void;
+  outgoingCalleeId?: string | null;
 }
 
-export default function ContactsList({ currentUserId, callInvitationService, onCallInitiated }: ContactsListProps) {
+export default function ContactsList({ currentUserId, callInvitationService, onCallInitiated, outgoingCalleeId }: ContactsListProps) {
   const [contacts, setContacts] = useState<UserProfile[]>([]);
   const [presenceMap, setPresenceMap] = useState<Map<string, UserPresence>>(new Map());
   const [loading, setLoading] = useState(true);
-  const [callingUserId, setCallingUserId] = useState<string | null>(null);
 
   useEffect(() => {
     loadContacts();
@@ -59,27 +59,15 @@ export default function ContactsList({ currentUserId, callInvitationService, onC
     }
   };
 
-  const handleCall = async (contact: UserProfile) => {
+  const handleCall = (contact: UserProfile) => {
     console.log('handleCall started for contact:', contact.user_id);
-    if (callingUserId) {
-      console.log('Already calling someone:', callingUserId);
+    if (outgoingCalleeId) {
+      console.log('Already calling someone:', outgoingCalleeId);
       return;
     }
 
-    setCallingUserId(contact.user_id);
-    console.log('Set callingUserId to:', contact.user_id);
-    try {
-      console.log('Calling initiateCall...');
-      const invitation = await callInvitationService.initiateCall(contact.user_id);
-      console.log('initiateCall succeeded, invitation:', invitation);
-      console.log('Calling onCallInitiated callback...');
-      onCallInitiated?.(contact.user_id);
-      console.log('handleCall completed successfully');
-    } catch (error) {
-      console.error('Failed to initiate call:', error);
-      alert('Failed to initiate call. Please try again.');
-      setCallingUserId(null);
-    }
+    console.log('Calling onCallInitiated callback...');
+    onCallInitiated?.(contact.user_id);
   };
 
   const getPresenceStatus = (userId: string) => {
@@ -134,7 +122,7 @@ export default function ContactsList({ currentUserId, callInvitationService, onC
         {contacts.map((contact) => {
           const status = getPresenceStatus(contact.user_id);
           const isInCall = status === 'in_call';
-          const isCalling = callingUserId === contact.user_id;
+          const isCalling = outgoingCalleeId === contact.user_id;
 
           return (
             <div

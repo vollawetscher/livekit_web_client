@@ -17,6 +17,7 @@ function MainApp() {
   const [activeTab, setActiveTab] = useState<'pstn' | 'webrtc'>('webrtc');
   const [incomingInvitation, setIncomingInvitation] = useState<CallInvitation | null>(null);
   const [outgoingInvitation, setOutgoingInvitation] = useState<CallInvitation | null>(null);
+  const [outgoingCalleeId, setOutgoingCalleeId] = useState<string | null>(null);
   const [isInCall, setIsInCall] = useState(false);
   const [callRoomName, setCallRoomName] = useState<string | null>(null);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
@@ -74,6 +75,7 @@ function MainApp() {
 
         if (invitation.status === 'rejected' || invitation.status === 'cancelled' || invitation.status === 'missed') {
           setOutgoingInvitation(null);
+          setOutgoingCalleeId(null);
           liveKitClientRef.current?.disconnect();
           liveKitClientRef.current = null;
           presenceManagerRef.current?.setInCall(false);
@@ -90,6 +92,7 @@ function MainApp() {
 
   const handleOutgoingCallAccepted = async (invitation: CallInvitation) => {
     setOutgoingInvitation(null);
+    setOutgoingCalleeId(null);
     setIsInCall(true);
     setCallRoomName(invitation.room_name);
   };
@@ -149,6 +152,7 @@ function MainApp() {
     try {
       await callInvitationServiceRef.current.cancelCall(outgoingInvitation.id);
       setOutgoingInvitation(null);
+      setOutgoingCalleeId(null);
 
       liveKitClientRef.current?.disconnect();
       liveKitClientRef.current = null;
@@ -178,22 +182,31 @@ function MainApp() {
   const handleCallInitiated = async (calleeUserId: string) => {
     if (!callInvitationServiceRef.current) return;
 
+    console.log('App.handleCallInitiated: Starting call to:', calleeUserId);
+    setOutgoingCalleeId(calleeUserId);
+
     try {
+      console.log('App.handleCallInitiated: Calling initiateCall...');
       const invitation = await callInvitationServiceRef.current.initiateCall(calleeUserId);
+      console.log('App.handleCallInitiated: Got invitation:', invitation);
       setOutgoingInvitation(invitation);
 
       if (!invitation.caller_token || !invitation.room_name) {
-        console.error('Missing token or room name in invitation');
+        console.error('App.handleCallInitiated: Missing token or room name in invitation');
+        setOutgoingCalleeId(null);
         return;
       }
 
+      console.log('App.handleCallInitiated: Setting in-call status...');
       await presenceManagerRef.current?.setInCall(true);
 
       const livekitUrl = import.meta.env.VITE_LIVEKIT_URL;
+      console.log('App.handleCallInitiated: LiveKit URL:', livekitUrl);
       if (!livekitUrl) {
         throw new Error('LiveKit URL not configured');
       }
 
+      console.log('App.handleCallInitiated: Creating LiveKit client...');
       liveKitClientRef.current = new LiveKitClient(
         (msg) => console.log(msg),
         () => {},
@@ -201,17 +214,23 @@ function MainApp() {
         () => {}
       );
 
+      console.log('App.handleCallInitiated: Connecting to LiveKit...');
       await liveKitClientRef.current.connect(livekitUrl, invitation.caller_token);
+      console.log('App.handleCallInitiated: Publishing audio...');
       await liveKitClientRef.current.publishAudio({
         echoCancellation: true,
         noiseSuppression: true,
         autoGainControl: true,
       });
+      console.log('App.handleCallInitiated: Publishing video...');
       await liveKitClientRef.current.publishVideo();
+      console.log('App.handleCallInitiated: Call setup complete!');
     } catch (error) {
-      console.error('Failed to initiate call:', error);
+      console.error('App.handleCallInitiated: Failed to initiate call:', error);
       setOutgoingInvitation(null);
+      setOutgoingCalleeId(null);
       await presenceManagerRef.current?.setInCall(false);
+      alert('Failed to initiate call. Please try again.');
     }
   };
 
@@ -341,6 +360,7 @@ function MainApp() {
                 currentUserId={userId}
                 callInvitationService={callInvitationServiceRef.current}
                 onCallInitiated={handleCallInitiated}
+                outgoingCalleeId={outgoingCalleeId}
               />
             )}
           </div>
