@@ -5,7 +5,8 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export class CallInvitationService {
   private userId: string;
-  private channel: any = null;
+  private incomingChannel: any = null;
+  private outgoingChannel: any = null;
   private onInvitationCallbacks: ((invitation: CallInvitation) => void)[] = [];
 
   constructor(userId: string) {
@@ -13,15 +14,39 @@ export class CallInvitationService {
   }
 
   async start() {
-    this.channel = await subscribeToCallInvitations(this.userId, (invitation) => {
-      this.onInvitationCallbacks.forEach(callback => callback(invitation));
-    });
+    this.incomingChannel = supabase
+      .channel('incoming_invitations')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'call_invitations',
+        filter: `callee_user_id=eq.${this.userId}`,
+      }, (payload) => {
+        this.onInvitationCallbacks.forEach(callback => callback(payload.new as CallInvitation));
+      })
+      .subscribe();
+
+    this.outgoingChannel = supabase
+      .channel('outgoing_invitations')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'call_invitations',
+        filter: `caller_user_id=eq.${this.userId}`,
+      }, (payload) => {
+        this.onInvitationCallbacks.forEach(callback => callback(payload.new as CallInvitation));
+      })
+      .subscribe();
   }
 
   async stop() {
-    if (this.channel) {
-      await this.channel.unsubscribe();
-      this.channel = null;
+    if (this.incomingChannel) {
+      await this.incomingChannel.unsubscribe();
+      this.incomingChannel = null;
+    }
+    if (this.outgoingChannel) {
+      await this.outgoingChannel.unsubscribe();
+      this.outgoingChannel = null;
     }
   }
 
