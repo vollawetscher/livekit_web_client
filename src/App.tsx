@@ -91,10 +91,10 @@ function MainApp() {
   };
 
   const handleOutgoingCallAccepted = async (invitation: CallInvitation) => {
+    console.log('App.handleOutgoingCallAccepted: Call was accepted, transitioning to in-call state');
     setOutgoingInvitation(null);
     setOutgoingCalleeId(null);
     setIsInCall(true);
-    setCallRoomName(invitation.room_name);
   };
 
   const handleAcceptCall = async () => {
@@ -187,15 +187,11 @@ function MainApp() {
 
     try {
       console.log('App.handleCallInitiated: Calling initiateCall...');
-      const invitation = await callInvitationServiceRef.current.initiateCall(calleeUserId);
+      const { invitation, caller_token, room_name } = await callInvitationServiceRef.current.initiateCall(calleeUserId);
       console.log('App.handleCallInitiated: Got invitation:', invitation);
+      console.log('App.handleCallInitiated: Got token and room:', { caller_token, room_name });
       setOutgoingInvitation(invitation);
-
-      if (!invitation.caller_token || !invitation.room_name) {
-        console.error('App.handleCallInitiated: Missing token or room name in invitation');
-        setOutgoingCalleeId(null);
-        return;
-      }
+      setCallRoomName(room_name);
 
       console.log('App.handleCallInitiated: Setting in-call status...');
       await presenceManagerRef.current?.setInCall(true);
@@ -214,8 +210,8 @@ function MainApp() {
         () => {}
       );
 
-      console.log('App.handleCallInitiated: Connecting to LiveKit...');
-      await liveKitClientRef.current.connect(livekitUrl, invitation.caller_token);
+      console.log('App.handleCallInitiated: Connecting to LiveKit with room:', room_name);
+      await liveKitClientRef.current.connect(livekitUrl, caller_token);
       console.log('App.handleCallInitiated: Publishing audio...');
       await liveKitClientRef.current.publishAudio({
         echoCancellation: true,
@@ -224,11 +220,12 @@ function MainApp() {
       });
       console.log('App.handleCallInitiated: Publishing video...');
       await liveKitClientRef.current.publishVideo();
-      console.log('App.handleCallInitiated: Call setup complete!');
+      console.log('App.handleCallInitiated: Call setup complete! Waiting in room for callee...');
     } catch (error) {
       console.error('App.handleCallInitiated: Failed to initiate call:', error);
       setOutgoingInvitation(null);
       setOutgoingCalleeId(null);
+      setCallRoomName(null);
       await presenceManagerRef.current?.setInCall(false);
       alert('Failed to initiate call. Please try again.');
     }

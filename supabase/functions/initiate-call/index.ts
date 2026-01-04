@@ -140,7 +140,12 @@ Deno.serve(async (req: Request) => {
     }
 
     return new Response(
-      JSON.stringify({ invitation, callee_online: isOnline }),
+      JSON.stringify({
+        invitation,
+        caller_token: callerJwt,
+        room_name,
+        callee_online: isOnline
+      }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {

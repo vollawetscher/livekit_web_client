@@ -50,7 +50,11 @@ export class CallInvitationService {
     }
   }
 
-  async initiateCall(calleeUserId: string): Promise<CallInvitation> {
+  async initiateCall(calleeUserId: string): Promise<{
+    invitation: CallInvitation;
+    caller_token: string;
+    room_name: string;
+  }> {
     console.log('initiateCall: Starting for callee:', calleeUserId);
     console.log('initiateCall: Getting caller profile for:', this.userId);
     const callerProfile = await getUserProfile(this.userId);
@@ -92,7 +96,11 @@ export class CallInvitationService {
 
     const data = await response.json();
     console.log('initiateCall: Success, invitation:', data.invitation);
-    return data.invitation;
+    return {
+      invitation: data.invitation,
+      caller_token: data.caller_token,
+      room_name: data.room_name,
+    };
   }
 
   async acceptCall(invitationId: string): Promise<{
