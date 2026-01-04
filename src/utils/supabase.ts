@@ -97,3 +97,134 @@ export async function upsertUserProfile(profile: UserProfile): Promise<UserProfi
   if (error) throw error;
   return data;
 }
+
+export interface CallInvitation {
+  id: string;
+  caller_user_id: string;
+  callee_user_id: string;
+  room_name: string;
+  status: 'pending' | 'accepted' | 'rejected' | 'cancelled' | 'missed' | 'ended';
+  caller_token?: string;
+  callee_token?: string;
+  created_at: string;
+  accepted_at?: string;
+  ended_at?: string;
+  expires_at: string;
+}
+
+export interface UserPresence {
+  id?: string;
+  user_id: string;
+  status: 'online' | 'offline' | 'away' | 'busy' | 'in_call';
+  last_seen_at: string;
+  metadata?: Record<string, unknown>;
+  updated_at: string;
+}
+
+export interface PushSubscription {
+  id?: string;
+  user_id: string;
+  endpoint: string;
+  p256dh_key: string;
+  auth_key: string;
+  user_agent?: string;
+  created_at?: string;
+  last_used_at?: string;
+  is_active?: boolean;
+}
+
+export async function getAllUsers(): Promise<UserProfile[]> {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .select('*')
+    .order('display_name');
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getUserPresence(userId: string): Promise<UserPresence | null> {
+  const { data, error } = await supabase
+    .from('user_presence')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function upsertUserPresence(presence: Partial<UserPresence> & { user_id: string }): Promise<UserPresence> {
+  const { data, error } = await supabase
+    .from('user_presence')
+    .upsert({
+      user_id: presence.user_id,
+      status: presence.status || 'online',
+      last_seen_at: new Date().toISOString(),
+      metadata: presence.metadata,
+      updated_at: new Date().toISOString(),
+    }, {
+      onConflict: 'user_id'
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function subscribeToPresence(callback: (presence: UserPresence) => void) {
+  return supabase
+    .channel('user_presence_changes')
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'user_presence',
+    }, (payload) => {
+      callback(payload.new as UserPresence);
+    })
+    .subscribe();
+}
+
+export async function subscribeToCallInvitations(userId: string, callback: (invitation: CallInvitation) => void) {
+  return supabase
+    .channel('call_invitations_changes')
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'call_invitations',
+      filter: `callee_user_id=eq.${userId}`,
+    }, (payload) => {
+      callback(payload.new as CallInvitation);
+    })
+    .subscribe();
+}
+
+export async function savePushSubscription(subscription: PushSubscription): Promise<PushSubscription> {
+  const { data, error } = await supabase
+    .from('push_subscriptions')
+    .upsert({
+      user_id: subscription.user_id,
+      endpoint: subscription.endpoint,
+      p256dh_key: subscription.p256dh_key,
+      auth_key: subscription.auth_key,
+      user_agent: subscription.user_agent,
+      is_active: true,
+    }, {
+      onConflict: 'endpoint'
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function removePushSubscription(endpoint: string): Promise<void> {
+  const { error } = await supabase
+    .from('push_subscriptions')
+    .delete()
+    .eq('endpoint', endpoint);
+
+  if (error) throw error;
+}
