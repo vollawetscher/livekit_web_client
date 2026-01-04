@@ -33,7 +33,7 @@ function MainApp() {
     }
 
     return () => {
-      cleanup();
+      void cleanup();
     };
   }, [userId]);
 
@@ -84,9 +84,9 @@ function MainApp() {
     });
   };
 
-  const cleanup = () => {
-    presenceManagerRef.current?.stop();
-    callInvitationServiceRef.current?.stop();
+  const cleanup = async () => {
+    await presenceManagerRef.current?.stop();
+    await callInvitationServiceRef.current?.stop();
     liveKitClientRef.current?.disconnect();
   };
 
