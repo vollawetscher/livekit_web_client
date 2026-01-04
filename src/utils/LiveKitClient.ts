@@ -31,6 +31,7 @@ export class LiveKitClient {
   private onAudioReceived?: () => void;
   private onCallStatus?: (event: CallStatusEvent) => void;
   private onStopRingtone?: () => void;
+  private onParticipantDisconnected?: (participantIdentity: string) => void;
   private isConnected = false;
   private sessionId: string = '';
   private localAudioTrack: LocalAudioTrack | null = null;
@@ -40,13 +41,15 @@ export class LiveKitClient {
     onLogMessage: (msg: string) => void,
     onAudioReceived?: () => void,
     onCallStatus?: (event: CallStatusEvent) => void,
-    onStopRingtone?: () => void
+    onStopRingtone?: () => void,
+    onParticipantDisconnected?: (participantIdentity: string) => void
   ) {
     this.room = new Room();
     this.onLogMessage = onLogMessage;
     this.onAudioReceived = onAudioReceived;
     this.onCallStatus = onCallStatus;
     this.onStopRingtone = onStopRingtone;
+    this.onParticipantDisconnected = onParticipantDisconnected;
 
     this.setupRoomListeners();
   }
@@ -177,6 +180,11 @@ export class LiveKitClient {
               sipParticipantId: participant.identity,
             });
           }
+        }
+      } else {
+        this.onLogMessage(`Participant left: ${participant.identity}`);
+        if (this.onParticipantDisconnected) {
+          this.onParticipantDisconnected(participant.identity);
         }
       }
     });

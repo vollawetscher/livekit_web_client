@@ -11,7 +11,7 @@ import { PresenceManager } from './utils/PresenceManager';
 import { NotificationManager } from './utils/NotificationManager';
 import { CallInvitationService } from './utils/CallInvitationService';
 import { LiveKitClient } from './utils/LiveKitClient';
-import { CallInvitation, getUserProfile } from './utils/supabase';
+import { CallInvitation, getUserProfile, supabase } from './utils/supabase';
 
 function MainApp() {
   const { userId, logout } = useAuth();
@@ -21,6 +21,7 @@ function MainApp() {
   const [outgoingCalleeId, setOutgoingCalleeId] = useState<string | null>(null);
   const [isInCall, setIsInCall] = useState(false);
   const [callRoomName, setCallRoomName] = useState<string | null>(null);
+  const [callSessionId, setCallSessionId] = useState<string | null>(null);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
   const [livekitRoom, setLivekitRoom] = useState<Room | null>(null);
 
@@ -28,6 +29,7 @@ function MainApp() {
   const notificationManagerRef = useRef<NotificationManager | null>(null);
   const callInvitationServiceRef = useRef<CallInvitationService | null>(null);
   const liveKitClientRef = useRef<LiveKitClient | null>(null);
+  const sessionChannelRef = useRef<any>(null);
 
   useEffect(() => {
     if (userId) {
@@ -81,16 +83,51 @@ function MainApp() {
           liveKitClientRef.current?.disconnect();
           liveKitClientRef.current = null;
           setLivekitRoom(null);
+          setCallSessionId(null);
           presenceManagerRef.current?.setInCall(false);
         }
       }
     });
   };
 
+  const subscribeToCallSession = async (sessionId: string) => {
+    try {
+      if (sessionChannelRef.current) {
+        await sessionChannelRef.current.unsubscribe();
+      }
+
+      sessionChannelRef.current = supabase
+        .channel(`call_session_${sessionId}`)
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'call_sessions',
+          filter: `id=eq.${sessionId}`,
+        }, (payload) => {
+          console.log('Call session updated:', payload.new);
+          if (payload.new && payload.new.status === 'ended') {
+            console.log('Call session ended remotely, ending local call');
+            alert('The call has ended.');
+            handleEndCall();
+          }
+        });
+
+      await sessionChannelRef.current.subscribe();
+      console.log('Subscribed to call session updates:', sessionId);
+    } catch (error) {
+      console.error('Failed to subscribe to call session:', error);
+    }
+  };
+
   const cleanup = async () => {
     await presenceManagerRef.current?.stop();
     await callInvitationServiceRef.current?.stop();
     liveKitClientRef.current?.disconnect();
+
+    if (sessionChannelRef.current) {
+      await sessionChannelRef.current.unsubscribe();
+      sessionChannelRef.current = null;
+    }
   };
 
   const handleOutgoingCallAccepted = async (invitation: CallInvitation) => {
@@ -108,9 +145,13 @@ function MainApp() {
     try {
       console.log('handleAcceptCall: Calling acceptCall API...');
       const result = await callInvitationServiceRef.current.acceptCall(incomingInvitation.id);
-      console.log('handleAcceptCall: Got result:', { room_name: result.room_name, hasToken: !!result.token });
+      console.log('handleAcceptCall: Got result:', { room_name: result.room_name, hasToken: !!result.token, session_id: result.session_id });
 
       setCallRoomName(result.room_name);
+      if (result.session_id) {
+        setCallSessionId(result.session_id);
+        subscribeToCallSession(result.session_id);
+      }
       setIncomingInvitation(null);
       setIsInCall(true);
 
@@ -127,7 +168,12 @@ function MainApp() {
         (msg) => console.log('[LiveKit]', msg),
         () => {},
         () => {},
-        () => {}
+        () => {},
+        (participantIdentity) => {
+          console.log('Participant disconnected:', participantIdentity);
+          alert('The other participant has left the call.');
+          handleEndCall();
+        }
       );
 
       console.log('handleAcceptCall: Connecting to LiveKit...');
@@ -154,6 +200,9 @@ function MainApp() {
         console.warn('handleAcceptCall: Failed to publish video (continuing with audio-only):', videoError);
       }
 
+      setLivekitRoom(liveKitClientRef.current.getRoom());
+      console.log('handleAcceptCall: Room state updated after track publication');
+
       console.log('handleAcceptCall: Call setup complete!');
     } catch (error) {
       console.error('handleAcceptCall: Failed to accept call:', error);
@@ -165,6 +214,7 @@ function MainApp() {
       setIncomingInvitation(null);
       setIsInCall(false);
       setLivekitRoom(null);
+      setCallSessionId(null);
       await presenceManagerRef.current?.setInCall(false);
 
       if (liveKitClientRef.current) {
@@ -196,6 +246,7 @@ function MainApp() {
       liveKitClientRef.current?.disconnect();
       liveKitClientRef.current = null;
       setLivekitRoom(null);
+      setCallSessionId(null);
       await presenceManagerRef.current?.setInCall(false);
     } catch (error) {
       console.error('Failed to cancel call:', error);
@@ -203,12 +254,30 @@ function MainApp() {
   };
 
   const handleEndCall = async () => {
+    if (sessionChannelRef.current) {
+      await sessionChannelRef.current.unsubscribe();
+      sessionChannelRef.current = null;
+    }
+
     liveKitClientRef.current?.disconnect();
     liveKitClientRef.current = null;
     setLivekitRoom(null);
 
+    if (callSessionId) {
+      try {
+        await supabase
+          .from('call_sessions')
+          .update({ status: 'ended', ended_at: new Date().toISOString() })
+          .eq('id', callSessionId);
+        console.log('Call session marked as ended:', callSessionId);
+      } catch (error) {
+        console.error('Failed to update call session:', error);
+      }
+    }
+
     setIsInCall(false);
     setCallRoomName(null);
+    setCallSessionId(null);
 
     await presenceManagerRef.current?.setInCall(false);
   };
@@ -248,7 +317,12 @@ function MainApp() {
         (msg) => console.log('[LiveKit]', msg),
         () => {},
         () => {},
-        () => {}
+        () => {},
+        (participantIdentity) => {
+          console.log('Participant disconnected:', participantIdentity);
+          alert('The other participant has left the call.');
+          handleEndCall();
+        }
       );
 
       console.log('handleCallInitiated: Connecting to LiveKit with room:', room_name);
@@ -275,6 +349,9 @@ function MainApp() {
         console.warn('handleCallInitiated: Failed to publish video (continuing with audio-only):', videoError);
       }
 
+      setLivekitRoom(liveKitClientRef.current.getRoom());
+      console.log('handleCallInitiated: Room state updated after track publication');
+
       console.log('handleCallInitiated: Call setup complete! Waiting in room for callee...');
     } catch (error) {
       console.error('handleCallInitiated: Failed to initiate call:', error);
@@ -285,6 +362,7 @@ function MainApp() {
       setOutgoingCalleeId(null);
       setCallRoomName(null);
       setLivekitRoom(null);
+      setCallSessionId(null);
       await presenceManagerRef.current?.setInCall(false);
 
       if (liveKitClientRef.current) {

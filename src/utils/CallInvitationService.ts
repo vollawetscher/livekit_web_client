@@ -107,6 +107,7 @@ export class CallInvitationService {
     room_name: string;
     token: string;
     caller_token: string;
+    session_id?: string;
   }> {
     const response = await fetch(`${SUPABASE_URL}/functions/v1/accept-call`, {
       method: 'POST',
@@ -130,6 +131,7 @@ export class CallInvitationService {
       room_name: data.room_name,
       token: data.callee_token,
       caller_token: data.caller_token,
+      session_id: data.session_id,
     };
   }
 
