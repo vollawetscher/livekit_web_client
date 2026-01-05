@@ -24,6 +24,21 @@ export interface CallHistoryRecord {
   timestamp?: string;
   created_at?: string;
   updated_at?: string;
+  call_type?: 'webrtc' | 'pstn';
+  callee_identifier?: string;
+  user_id?: string;
+}
+
+export interface PhoneContact {
+  id?: string;
+  user_id: string;
+  contact_name: string;
+  phone_number: string;
+  avatar_url?: string;
+  notes?: string;
+  is_favorite?: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export async function insertCallHistory(record: CallHistoryRecord) {
@@ -49,12 +64,18 @@ export async function updateCallHistory(callId: string, status: string) {
   return data;
 }
 
-export async function getCallHistory(limit = 50) {
-  const { data, error } = await supabase
+export async function getCallHistory(limit = 50, userId?: string) {
+  let query = supabase
     .from('call_history')
     .select('*')
     .order('created_at', { ascending: false })
     .limit(limit);
+
+  if (userId) {
+    query = query.eq('user_id', userId);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw error;
   return data || [];
@@ -231,4 +252,66 @@ export async function removePushSubscription(endpoint: string): Promise<void> {
     .eq('endpoint', endpoint);
 
   if (error) throw error;
+}
+
+export async function getPhoneContacts(userId: string): Promise<PhoneContact[]> {
+  const { data, error } = await supabase
+    .from('phone_contacts')
+    .select('*')
+    .eq('user_id', userId)
+    .order('is_favorite', { ascending: false })
+    .order('contact_name', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createPhoneContact(contact: Omit<PhoneContact, 'id' | 'created_at' | 'updated_at'>): Promise<PhoneContact> {
+  const { data, error } = await supabase
+    .from('phone_contacts')
+    .insert({
+      ...contact,
+      updated_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function updatePhoneContact(id: string, updates: Partial<PhoneContact>): Promise<PhoneContact> {
+  const { data, error } = await supabase
+    .from('phone_contacts')
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function deletePhoneContact(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('phone_contacts')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
+}
+
+export async function getPhoneContactByNumber(userId: string, phoneNumber: string): Promise<PhoneContact | null> {
+  const { data, error } = await supabase
+    .from('phone_contacts')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('phone_number', phoneNumber)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
 }
