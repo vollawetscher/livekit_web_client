@@ -67,10 +67,10 @@ export default function VideoGrid({ room, activeSpeakers }: VideoGridProps) {
 
   if (!room || participants.length === 0) {
     return (
-      <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-8">
+      <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-4 sm:p-6 md:p-8">
         <div className="text-center text-slate-400">
-          <p className="text-sm">No active participants</p>
-          <p className="text-xs mt-1">Connect to start a session</p>
+          <p className="text-xs sm:text-sm">No active participants</p>
+          <p className="text-[10px] sm:text-xs mt-1">Connect to start a session</p>
         </div>
       </div>
     );
@@ -79,14 +79,14 @@ export default function VideoGrid({ room, activeSpeakers }: VideoGridProps) {
   const getGridClass = () => {
     const count = participants.length;
     if (count === 1) return 'grid-cols-1';
-    if (count === 2) return 'grid-cols-1 md:grid-cols-2';
-    if (count <= 4) return 'grid-cols-2';
+    if (count === 2) return 'grid-cols-1 sm:grid-cols-2';
+    if (count <= 4) return 'grid-cols-1 sm:grid-cols-2';
     if (count <= 6) return 'grid-cols-2 md:grid-cols-3';
     return 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4';
   };
 
   return (
-    <div className={`grid ${getGridClass()} gap-4 auto-rows-fr`}>
+    <div className={`grid ${getGridClass()} gap-2 sm:gap-3 md:gap-4 auto-rows-fr`}>
       {participants.map((participant) => {
         const isLocal = participant === room.localParticipant;
         const isSpeaking = activeSpeakers.has(participant.identity);

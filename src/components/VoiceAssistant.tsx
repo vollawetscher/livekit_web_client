@@ -548,18 +548,18 @@ export default function VoiceAssistant() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 text-white">
-      <div className="container mx-auto px-4 py-4 max-w-7xl">
-        <div className="text-center mb-4">
-          <h1 className="text-2xl font-bold flex items-center justify-center gap-2">
-            <Mic className="w-6 h-6" />
+      <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 max-w-7xl">
+        <div className="text-center mb-3 sm:mb-4">
+          <h1 className="text-xl sm:text-2xl font-bold flex items-center justify-center gap-1.5 sm:gap-2">
+            <Mic className="w-5 h-5 sm:w-6 sm:h-6" />
             Voice Assistant
           </h1>
         </div>
 
-        <div className="mb-3 grid grid-cols-2 md:grid-cols-4 gap-2">
+        <div className="mb-2 sm:mb-3 grid grid-cols-2 md:grid-cols-4 gap-1.5 sm:gap-2">
           <button
             onClick={handleToggleConnection}
-            className={`py-2 rounded-lg font-semibold text-sm flex items-center justify-center gap-1 transition-all shadow-lg ${
+            className={`py-1.5 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm flex items-center justify-center gap-1 transition-all shadow-lg ${
               isConnected
                 ? 'bg-red-600 hover:bg-red-700 active:scale-95'
                 : 'bg-green-600 hover:bg-green-700 active:scale-95'
@@ -567,13 +567,13 @@ export default function VoiceAssistant() {
           >
             {isConnected ? (
               <>
-                <Wifi className="w-4 h-4" />
-                Disconnect
+                <Wifi className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">Disconnect</span>
               </>
             ) : (
               <>
-                <WifiOff className="w-4 h-4" />
-                Connect
+                <WifiOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">Connect</span>
               </>
             )}
           </button>
@@ -581,41 +581,43 @@ export default function VoiceAssistant() {
           <button
             onClick={handleToggleVideo}
             disabled={!isConnected}
-            className={`py-2 rounded-lg font-semibold text-sm flex items-center justify-center gap-1 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
+            className={`py-1.5 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm flex items-center justify-center gap-1 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
               isVideoEnabled
                 ? 'bg-blue-600 hover:bg-blue-700 active:scale-95'
                 : 'bg-slate-700 hover:bg-slate-600 active:scale-95'
             }`}
           >
-            <Video className="w-4 h-4" />
-            {isVideoEnabled ? 'Stop Video' : 'Start Video'}
+            <Video className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">{isVideoEnabled ? 'Stop Video' : 'Start Video'}</span>
+            <span className="sm:hidden">{isVideoEnabled ? 'Stop' : 'Video'}</span>
           </button>
 
           <button
             onClick={() => setIsLogsExpanded(!isLogsExpanded)}
-            className="py-2 rounded-lg font-semibold text-sm flex items-center justify-center gap-1 transition-all bg-slate-700 hover:bg-slate-600"
+            className="py-1.5 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm flex items-center justify-center gap-1 transition-all bg-slate-700 hover:bg-slate-600"
           >
             <Bug className="w-3 h-3" />
-            Logs {isLogsExpanded ? '▼' : '▶'}
+            <span className="hidden sm:inline">Logs {isLogsExpanded ? '▼' : '▶'}</span>
+            <span className="sm:hidden">{isLogsExpanded ? '▼' : '▶'}</span>
           </button>
 
           <button
             onClick={() => setIsSettingsOpen(true)}
-            className="py-2 rounded-lg font-semibold text-sm flex items-center justify-center gap-1 transition-all bg-slate-700 hover:bg-slate-600"
+            className="py-1.5 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm flex items-center justify-center gap-1 transition-all bg-slate-700 hover:bg-slate-600"
           >
-            <Settings className="w-4 h-4" />
-            Settings
+            <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">Settings</span>
           </button>
         </div>
 
         {isLogsExpanded && (
-          <div className="mb-3 bg-slate-800/50 rounded-lg border border-slate-700 p-3 max-h-40 overflow-y-auto">
+          <div className="mb-2 sm:mb-3 bg-slate-800/50 rounded-lg border border-slate-700 p-2 sm:p-3 max-h-32 sm:max-h-40 overflow-y-auto">
             {logs.length === 0 ? (
-              <p className="text-slate-500 text-xs italic">No activity yet...</p>
+              <p className="text-slate-500 text-[10px] sm:text-xs italic">No activity yet...</p>
             ) : (
-              <div className="space-y-1">
+              <div className="space-y-0.5 sm:space-y-1">
                 {logs.map((log, index) => (
-                  <div key={index} className="text-xs font-mono text-slate-300 break-words">
+                  <div key={index} className="text-[10px] sm:text-xs font-mono text-slate-300 break-words">
                     {log}
                   </div>
                 ))}
@@ -625,14 +627,14 @@ export default function VoiceAssistant() {
         )}
 
         {isConnected && (
-          <div className="mb-3">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-2">
-                <div className="flex items-center gap-1 mb-1">
-                  <Mic className="w-3 h-3 text-blue-400" />
-                  <span className="text-xs font-medium text-slate-300">Mic</span>
+          <div className="mb-2 sm:mb-3">
+            <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+              <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-1.5 sm:p-2">
+                <div className="flex items-center gap-0.5 sm:gap-1 mb-0.5 sm:mb-1">
+                  <Mic className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-blue-400" />
+                  <span className="text-[10px] sm:text-xs font-medium text-slate-300">Mic</span>
                 </div>
-                <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                <div className="h-1 sm:h-1.5 bg-slate-700 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-75"
                     style={{ width: `${inputLevel * 100}%` }}
@@ -640,12 +642,12 @@ export default function VoiceAssistant() {
                 </div>
               </div>
 
-              <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-2">
-                <div className="flex items-center gap-1 mb-1">
-                  <div className={`w-2 h-2 rounded-full transition-colors ${isReceivingAudio ? 'bg-green-400' : 'bg-slate-600'}`} />
-                  <span className="text-xs font-medium text-slate-300">Assistant</span>
+              <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-1.5 sm:p-2">
+                <div className="flex items-center gap-0.5 sm:gap-1 mb-0.5 sm:mb-1">
+                  <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full transition-colors ${isReceivingAudio ? 'bg-green-400' : 'bg-slate-600'}`} />
+                  <span className="text-[10px] sm:text-xs font-medium text-slate-300">Assistant</span>
                 </div>
-                <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                <div className="h-1 sm:h-1.5 bg-slate-700 rounded-full overflow-hidden">
                   <div
                     className={`h-full transition-all duration-200 ${
                       isReceivingAudio
@@ -660,7 +662,7 @@ export default function VoiceAssistant() {
         )}
 
         {isConnected && (
-          <div className="mb-3">
+          <div className="mb-2 sm:mb-3">
             <RoomInfo
               room={liveKitClientRef.current?.getRoom() || null}
               participantCount={liveKitClientRef.current?.getRoom().numParticipants || 0}
@@ -668,9 +670,9 @@ export default function VoiceAssistant() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-4">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4 mb-3 sm:mb-4">
           {isConnected && (
-            <div className="lg:col-span-1 space-y-3">
+            <div className="lg:col-span-1 space-y-2 sm:space-y-3">
               <ParticipantsPanel
                 room={liveKitClientRef.current?.getRoom() || null}
                 audioLevels={audioLevels}
@@ -685,7 +687,7 @@ export default function VoiceAssistant() {
           )}
 
           <div className={`${isConnected ? 'lg:col-span-3' : 'lg:col-span-4'}`}>
-            <div className="bg-slate-800/30 rounded-lg border border-slate-700 p-4 mb-4">
+            <div className="bg-slate-800/30 rounded-lg border border-slate-700 p-2 sm:p-3 md:p-4 mb-3 sm:mb-4">
               <VideoGrid
                 room={liveKitClientRef.current?.getRoom() || null}
                 activeSpeakers={activeSpeakers}
@@ -695,7 +697,7 @@ export default function VoiceAssistant() {
         </div>
 
         {callStatus && (
-          <div className={`mb-3 p-2 rounded-lg border ${
+          <div className={`mb-2 sm:mb-3 p-1.5 sm:p-2 rounded-lg border ${
             callStatus === 'ringing' || callStatus === 'initiated'
               ? 'bg-blue-900/30 border-blue-500/50'
               : callStatus === 'answered' || callStatus === 'in-progress'
@@ -704,7 +706,7 @@ export default function VoiceAssistant() {
               ? 'bg-slate-800/50 border-slate-500/50'
               : 'bg-red-900/30 border-red-500/50'
           }`}>
-            <p className={`text-xs font-medium capitalize text-center ${
+            <p className={`text-[10px] sm:text-xs font-medium capitalize text-center ${
               callStatus === 'ringing' || callStatus === 'initiated'
                 ? 'text-blue-300'
                 : callStatus === 'answered' || callStatus === 'in-progress'
@@ -718,7 +720,7 @@ export default function VoiceAssistant() {
           </div>
         )}
 
-        <div className="mb-3">
+        <div className="mb-2 sm:mb-3">
           <Dialpad
             onDial={handleDial}
             onHangup={handleHangup}

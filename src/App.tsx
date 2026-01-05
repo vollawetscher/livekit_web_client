@@ -400,19 +400,19 @@ function MainApp() {
       {outgoingInvitation && (
         <div className="fixed inset-0 bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 z-50 flex flex-col items-center justify-center text-white">
           <div className="absolute inset-0 bg-black opacity-20" />
-          <div className="relative z-10 flex flex-col items-center space-y-8">
-            <div className="w-32 h-32 rounded-full bg-white bg-opacity-20 backdrop-blur-sm border-4 border-white shadow-2xl flex items-center justify-center">
-              <Phone className="w-16 h-16 text-white animate-pulse" />
+          <div className="relative z-10 flex flex-col items-center space-y-4 sm:space-y-6 md:space-y-8 px-4">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 lg:w-32 lg:h-32 rounded-full bg-white bg-opacity-20 backdrop-blur-sm border-2 sm:border-3 md:border-4 border-white shadow-2xl flex items-center justify-center">
+              <Phone className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 text-white animate-pulse" />
             </div>
 
             <div className="text-center">
-              <h2 className="text-4xl font-bold mb-2">Calling...</h2>
-              <p className="text-lg opacity-90">Waiting for answer</p>
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-1 sm:mb-2">Calling...</h2>
+              <p className="text-sm sm:text-base md:text-lg opacity-90">Waiting for answer</p>
             </div>
 
             <button
               onClick={handleCancelOutgoingCall}
-              className="px-8 py-3 bg-red-600 hover:bg-red-700 rounded-full font-medium transition-colors"
+              className="px-5 sm:px-6 md:px-8 py-2 sm:py-2.5 md:py-3 bg-red-600 hover:bg-red-700 rounded-full font-medium transition-colors text-sm sm:text-base"
             >
               Cancel
             </button>
@@ -420,72 +420,75 @@ function MainApp() {
         </div>
       )}
 
-      <div className="container mx-auto px-4 py-6 max-w-6xl">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-6xl">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6 gap-3 sm:gap-0">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
             WebRTC Calling
           </h1>
 
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             {notificationPermission !== 'granted' && (
               <button
                 onClick={handleRequestNotificationPermission}
-                className="flex items-center space-x-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg transition-colors"
+                className="flex items-center space-x-1.5 sm:space-x-2 px-2.5 sm:px-3 md:px-4 py-1.5 sm:py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg transition-colors text-xs sm:text-sm"
               >
-                <Bell className="w-4 h-4" />
-                <span className="text-sm">Enable Notifications</span>
+                <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">Enable Notifications</span>
+                <span className="sm:hidden">Notify</span>
               </button>
             )}
 
             <button
               onClick={handleLogout}
-              className="flex items-center space-x-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+              className="flex items-center space-x-1.5 sm:space-x-2 px-2.5 sm:px-3 md:px-4 py-1.5 sm:py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors text-xs sm:text-sm"
             >
-              <LogOut className="w-4 h-4" />
-              <span className="text-sm">Logout</span>
+              <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">Logout</span>
             </button>
 
-            <div className="flex bg-slate-800 rounded-lg p-1">
+            <div className="flex bg-slate-800 rounded-lg p-0.5 sm:p-1">
               <button
                 onClick={() => setActiveTab('webrtc')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-2 ${
+                className={`px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition-colors flex items-center space-x-1 sm:space-x-2 ${
                   activeTab === 'webrtc'
                     ? 'bg-blue-600 text-white'
                     : 'text-gray-400 hover:text-white'
                 }`}
               >
-                <Users className="w-4 h-4" />
-                <span>Web Calling</span>
+                <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">Web Calling</span>
+                <span className="sm:hidden">Web</span>
               </button>
               <button
                 onClick={() => setActiveTab('pstn')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-2 ${
+                className={`px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition-colors flex items-center space-x-1 sm:space-x-2 ${
                   activeTab === 'pstn'
                     ? 'bg-blue-600 text-white'
                     : 'text-gray-400 hover:text-white'
                 }`}
               >
-                <Phone className="w-4 h-4" />
-                <span>Phone Calling</span>
+                <Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">Phone Calling</span>
+                <span className="sm:hidden">Phone</span>
               </button>
             </div>
           </div>
         </div>
 
         {isInCall ? (
-          <div className="space-y-4">
-            <div className="bg-slate-800 rounded-lg p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold">In Call</h2>
+          <div className="space-y-3 sm:space-y-4">
+            <div className="bg-slate-800 rounded-lg p-3 sm:p-4 md:p-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-3 sm:mb-4 gap-2 sm:gap-0">
+                <h2 className="text-lg sm:text-xl font-semibold">In Call</h2>
                 <button
                   onClick={handleEndCall}
-                  className="px-6 py-2 bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-colors"
+                  className="w-full sm:w-auto px-4 sm:px-5 md:px-6 py-2 bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-colors text-sm sm:text-base"
                 >
                   End Call
                 </button>
               </div>
 
-              <div className="bg-slate-900 rounded-lg p-4 min-h-[400px]">
+              <div className="bg-slate-900 rounded-lg p-2 sm:p-3 md:p-4 min-h-[300px] sm:min-h-[400px]">
                 <VideoGrid
                   room={livekitRoom}
                   activeSpeakers={new Set()}
@@ -494,7 +497,7 @@ function MainApp() {
             </div>
           </div>
         ) : (
-          <div className="bg-slate-800 rounded-lg p-6">
+          <div className="bg-slate-800 rounded-lg p-3 sm:p-4 md:p-6">
             {userId && callInvitationServiceRef.current && (
               <ContactsList
                 currentUserId={userId}
@@ -506,16 +509,17 @@ function MainApp() {
           </div>
         )}
 
-        <div className="mt-6 text-center text-sm text-gray-500">
+        <div className="mt-4 sm:mt-6 text-center text-xs sm:text-sm text-gray-500">
           {notificationPermission === 'granted' ? (
-            <div className="flex items-center justify-center space-x-2">
-              <Bell className="w-4 h-4 text-green-500" />
+            <div className="flex items-center justify-center space-x-1.5 sm:space-x-2">
+              <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-500" />
               <span>Notifications enabled</span>
             </div>
           ) : (
-            <div className="flex items-center justify-center space-x-2">
-              <BellOff className="w-4 h-4 text-gray-500" />
-              <span>Enable notifications to receive calls when away</span>
+            <div className="flex items-center justify-center space-x-1.5 sm:space-x-2">
+              <BellOff className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500" />
+              <span className="hidden sm:inline">Enable notifications to receive calls when away</span>
+              <span className="sm:hidden">Enable notifications for calls</span>
             </div>
           )}
         </div>

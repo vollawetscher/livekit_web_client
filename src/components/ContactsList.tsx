@@ -123,7 +123,7 @@ export default function ContactsList({ currentUserId, callInvitationService, onC
 
   return (
     <div className="space-y-2">
-      <h2 className="text-xl font-semibold mb-4 text-gray-800">Contacts</h2>
+      <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 text-white">Contacts</h2>
       <div className="space-y-2">
         {contacts.map((contact) => {
           const status = getPresenceStatus(contact.user_id);
@@ -133,50 +133,50 @@ export default function ContactsList({ currentUserId, callInvitationService, onC
           return (
             <div
               key={contact.user_id}
-              className="flex items-center justify-between p-4 bg-white rounded-lg shadow hover:shadow-md transition-shadow"
+              className="flex items-center justify-between p-3 sm:p-4 bg-slate-700/50 rounded-lg border border-slate-600 hover:border-slate-500 transition-all"
             >
-              <div className="flex items-center space-x-3">
-                <div className="relative">
+              <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
+                <div className="relative flex-shrink-0">
                   {contact.avatar_url ? (
                     <img
                       src={contact.avatar_url}
                       alt={contact.display_name}
-                      className="w-12 h-12 rounded-full object-cover"
+                      className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover"
                     />
                   ) : (
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold text-sm sm:text-base">
                       {contact.display_name.charAt(0).toUpperCase()}
                     </div>
                   )}
                   <div
-                    className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${getPresenceColor(status)}`}
+                    className={`absolute bottom-0 right-0 w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full border-2 border-slate-700 ${getPresenceColor(status)}`}
                     title={getPresenceLabel(status)}
                   />
                 </div>
-                <div>
-                  <div className="font-medium text-gray-900">{contact.display_name}</div>
-                  <div className="text-sm text-gray-500">{getPresenceLabel(status)}</div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium text-white text-sm sm:text-base truncate">{contact.display_name}</div>
+                  <div className="text-xs sm:text-sm text-slate-400 truncate">{getPresenceLabel(status)}</div>
                 </div>
               </div>
 
               <button
                 onClick={() => handleCall(contact)}
                 disabled={isCalling || isInCall}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                className={`flex items-center space-x-1 sm:space-x-2 px-2.5 sm:px-3 md:px-4 py-1.5 sm:py-2 rounded-lg font-medium transition-colors text-xs sm:text-sm flex-shrink-0 ml-2 ${
                   isCalling || isInCall
-                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    ? 'bg-slate-600 text-slate-400 cursor-not-allowed'
                     : 'bg-blue-600 text-white hover:bg-blue-700'
                 }`}
               >
                 {isCalling ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Calling...</span>
+                    <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span className="hidden sm:inline">Calling...</span>
                   </>
                 ) : (
                   <>
-                    <Video className="w-4 h-4" />
-                    <span>Call</span>
+                    <Video className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <span className="hidden sm:inline">Call</span>
                   </>
                 )}
               </button>
