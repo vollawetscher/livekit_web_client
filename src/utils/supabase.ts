@@ -90,6 +90,17 @@ export interface UserProfile {
   updated_at?: string;
 }
 
+export async function getCallSessionByInvitationId(invitationId: string) {
+  const { data, error } = await supabase
+    .from('call_sessions')
+    .select('*')
+    .eq('invitation_id', invitationId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
 export async function getUserProfile(userId: string): Promise<UserProfile | null> {
   const { data, error } = await supabase
     .from('user_profiles')

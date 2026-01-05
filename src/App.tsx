@@ -16,7 +16,7 @@ import { LiveKitClient, CallStatusEvent } from './utils/LiveKitClient';
 import { DialService } from './utils/DialService';
 import { TokenManager } from './utils/TokenManager';
 import { AudioRecorder } from './utils/AudioRecorder';
-import { CallInvitation, getUserProfile, supabase, insertCallHistory, updateCallHistory, PhoneContact } from './utils/supabase';
+import { CallInvitation, getUserProfile, supabase, insertCallHistory, updateCallHistory, PhoneContact, getCallSessionByInvitationId } from './utils/supabase';
 
 function MainApp() {
   const { userId, logout } = useAuth();
@@ -279,14 +279,39 @@ function MainApp() {
     setOutgoingInvitation(null);
     setOutgoingCalleeId(null);
     setIsInCall(true);
+
+    try {
+      const callSession = await getCallSessionByInvitationId(invitation.id);
+      if (callSession?.id) {
+        setCallSessionId(callSession.id);
+        await subscribeToCallSession(callSession.id);
+        console.log('Initiator subscribed to call session:', callSession.id);
+      }
+    } catch (error) {
+      console.error('Failed to subscribe to call session:', error);
+    }
   };
 
-  const handleRemoteParticipantConnected = (participantIdentity: string) => {
+  const handleRemoteParticipantConnected = async (participantIdentity: string) => {
     if (!participantIdentity.startsWith('sip-') && outgoingInvitation) {
       console.log('Remote participant connected during outgoing call, transitioning to in-call state');
+
+      const invitationId = outgoingInvitation.id;
+
       setOutgoingInvitation(null);
       setOutgoingCalleeId(null);
       setIsInCall(true);
+
+      try {
+        const callSession = await getCallSessionByInvitationId(invitationId);
+        if (callSession?.id) {
+          setCallSessionId(callSession.id);
+          await subscribeToCallSession(callSession.id);
+          console.log('Initiator subscribed to call session via participant connect:', callSession.id);
+        }
+      } catch (error) {
+        console.error('Failed to subscribe to call session:', error);
+      }
     }
   };
 
