@@ -32,6 +32,7 @@ export class LiveKitClient {
   private onCallStatus?: (event: CallStatusEvent) => void;
   private onStopRingtone?: () => void;
   private onParticipantDisconnected?: (participantIdentity: string) => void;
+  private onParticipantConnected?: (participantIdentity: string) => void;
   private isConnected = false;
   private sessionId: string = '';
   private localAudioTrack: LocalAudioTrack | null = null;
@@ -42,7 +43,8 @@ export class LiveKitClient {
     onAudioReceived?: () => void,
     onCallStatus?: (event: CallStatusEvent) => void,
     onStopRingtone?: () => void,
-    onParticipantDisconnected?: (participantIdentity: string) => void
+    onParticipantDisconnected?: (participantIdentity: string) => void,
+    onParticipantConnected?: (participantIdentity: string) => void
   ) {
     this.room = new Room();
     this.onLogMessage = onLogMessage;
@@ -50,6 +52,7 @@ export class LiveKitClient {
     this.onCallStatus = onCallStatus;
     this.onStopRingtone = onStopRingtone;
     this.onParticipantDisconnected = onParticipantDisconnected;
+    this.onParticipantConnected = onParticipantConnected;
 
     this.setupRoomListeners();
   }
@@ -159,6 +162,10 @@ export class LiveKitClient {
       if (participant.identity.startsWith('sip-')) {
         this.onLogMessage(`🔔 SIP participant connected (call may be ringing)`);
         console.log('SIP participant metadata:', participant.metadata);
+      } else {
+        if (this.onParticipantConnected) {
+          this.onParticipantConnected(participant.identity);
+        }
       }
     });
 

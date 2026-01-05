@@ -281,6 +281,15 @@ function MainApp() {
     setIsInCall(true);
   };
 
+  const handleRemoteParticipantConnected = (participantIdentity: string) => {
+    if (!participantIdentity.startsWith('sip-') && outgoingInvitation) {
+      console.log('Remote participant connected during outgoing call, transitioning to in-call state');
+      setOutgoingInvitation(null);
+      setOutgoingCalleeId(null);
+      setIsInCall(true);
+    }
+  };
+
   const handleAcceptCall = async () => {
     if (!incomingInvitation || !callInvitationServiceRef.current) return;
 
@@ -311,7 +320,8 @@ function MainApp() {
         (participantIdentity) => {
           alert('The other participant has left the call.');
           handleEndCall();
-        }
+        },
+        handleRemoteParticipantConnected
       );
 
       await liveKitClientRef.current.connect(livekitUrl, result.token);
@@ -441,7 +451,8 @@ function MainApp() {
         (participantIdentity) => {
           alert('The other participant has left the call.');
           handleEndCall();
-        }
+        },
+        handleRemoteParticipantConnected
       );
 
       await liveKitClientRef.current.connect(livekitUrl, caller_token);
