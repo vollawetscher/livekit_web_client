@@ -328,6 +328,7 @@ function MainApp() {
     const isTerminal = ['completed', 'failed', 'busy', 'no-answer'].includes(event.status);
     if (isTerminal) {
       stopRingtone();
+      setIsInCall(false);
 
       setTimeout(() => {
         setPstnCallStatus(null);
@@ -945,7 +946,7 @@ function MainApp() {
               )}
 
               <div className="bg-slate-800 rounded-lg p-3 sm:p-4 md:p-6">
-                {mediaWorkers.length > 0 && callType === 'webrtc' && (
+                {mediaWorkers.length > 0 && (
                   <div className="flex flex-wrap gap-2 mb-3">
                     {mediaWorkers.map((worker) => (
                       <MediaWorkerBadge key={worker.identity} worker={worker} />
