@@ -138,6 +138,8 @@ function MainApp() {
     await callInvitationServiceRef.current.start();
 
     callInvitationServiceRef.current.onInvitation((invitation) => {
+      console.log('onInvitation callback received:', invitation);
+
       if (invitation.callee_user_id === userId) {
         if (invitation.status === 'pending') {
           setIncomingInvitation(invitation);
@@ -158,7 +160,9 @@ function MainApp() {
       }
 
       if (invitation.caller_user_id === userId) {
+        console.log('Invitation is from current user, status:', invitation.status);
         if (invitation.status === 'accepted') {
+          console.log('Calling handleOutgoingCallAccepted');
           handleOutgoingCallAccepted(invitation);
         }
 
@@ -336,6 +340,7 @@ function MainApp() {
   };
 
   const handleOutgoingCallAccepted = async (invitation: CallInvitation) => {
+    console.log('handleOutgoingCallAccepted called', invitation);
     stopRingtone();
 
     setOutgoingInvitation(null);
