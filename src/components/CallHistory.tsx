@@ -12,7 +12,7 @@ interface CallHistoryProps {
 export default function CallHistory({ onRedial, isDialing, currentCallId, refreshTrigger }: CallHistoryProps) {
   const [history, setHistory] = useState<CallHistoryRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
 
   useEffect(() => {
     loadHistory();

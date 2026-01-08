@@ -5,7 +5,6 @@ import { useAuth } from './contexts/AuthContext';
 import AuthScreen from './components/AuthScreen';
 import UnifiedContacts from './components/UnifiedContacts';
 import PhoneContactModal from './components/PhoneContactModal';
-import Dialpad from './components/Dialpad';
 import CallHistory from './components/CallHistory';
 import IncomingCallDialog from './components/IncomingCallDialog';
 import VideoGrid from './components/VideoGrid';
@@ -935,64 +934,68 @@ function MainApp() {
         </div>
 
         {isInCall ? (
-          <div className="space-y-3 sm:space-y-4">
-            {participantLeftName && (
-              <ParticipantNotification
-                participantName={participantLeftName}
-                onClose={() => setParticipantLeftName(null)}
-              />
-            )}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2 space-y-3 sm:space-y-4">
+              {participantLeftName && (
+                <ParticipantNotification
+                  participantName={participantLeftName}
+                  onClose={() => setParticipantLeftName(null)}
+                />
+              )}
 
-            {mediaWorkers.length > 0 && callType === 'webrtc' && (
-              <div className="fixed top-20 right-4 z-40 flex flex-col gap-2">
-                {mediaWorkers.map((worker) => (
-                  <MediaWorkerBadge key={worker.identity} worker={worker} />
-                ))}
-              </div>
-            )}
+              {mediaWorkers.length > 0 && callType === 'webrtc' && (
+                <div className="fixed top-20 right-4 z-40 flex flex-col gap-2">
+                  {mediaWorkers.map((worker) => (
+                    <MediaWorkerBadge key={worker.identity} worker={worker} />
+                  ))}
+                </div>
+              )}
 
-            <div className="bg-slate-800 rounded-lg p-3 sm:p-4 md:p-6">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-3 sm:mb-4 gap-2 sm:gap-0">
-                <h2 className="text-lg sm:text-xl font-semibold">
-                  In Call {callType === 'pstn' ? '(Phone)' : '(Video)'}
-                </h2>
-                <div className="flex items-center gap-3">
-                  {callType === 'webrtc' && aloneStartTime && (
-                    <span className="text-sm text-amber-400">
-                      Waiting for others... ({Math.floor((Date.now() - aloneStartTime) / 1000)}s)
-                    </span>
-                  )}
-                  <button
-                    onClick={callType === 'pstn' ? handlePSTNHangup : handleEndCall}
-                    className="w-full sm:w-auto px-4 sm:px-5 md:px-6 py-2 bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-colors text-sm sm:text-base"
-                  >
-                    End Call
-                  </button>
+              <div className="bg-slate-800 rounded-lg p-3 sm:p-4 md:p-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-3 sm:mb-4 gap-2 sm:gap-0">
+                  <h2 className="text-lg sm:text-xl font-semibold">
+                    In Call {callType === 'pstn' ? '(Phone)' : '(Video)'}
+                  </h2>
+                  <div className="flex items-center gap-3">
+                    {callType === 'webrtc' && aloneStartTime && (
+                      <span className="text-sm text-amber-400">
+                        Waiting for others... ({Math.floor((Date.now() - aloneStartTime) / 1000)}s)
+                      </span>
+                    )}
+                    <button
+                      onClick={callType === 'pstn' ? handlePSTNHangup : handleEndCall}
+                      className="w-full sm:w-auto px-4 sm:px-5 md:px-6 py-2 bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-colors text-sm sm:text-base"
+                    >
+                      End Call
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-slate-900 rounded-lg p-2 sm:p-3 md:p-4 min-h-[300px] sm:min-h-[400px]">
+                  <VideoGrid
+                    room={livekitRoom}
+                    activeSpeakers={new Set()}
+                  />
                 </div>
               </div>
+            </div>
 
-              <div className="bg-slate-900 rounded-lg p-2 sm:p-3 md:p-4 min-h-[300px] sm:min-h-[400px]">
-                <VideoGrid
-                  room={livekitRoom}
-                  activeSpeakers={new Set()}
-                />
+            <div className="lg:col-span-1">
+              <div className="bg-slate-800 rounded-lg p-3 sm:p-4 h-full">
+                {userId && (
+                  <CallHistory
+                    onRedial={handlePSTNDial}
+                    isDialing={isPSTNDialing}
+                    currentCallId={activePSTNCallId}
+                    refreshTrigger={historyRefreshKey}
+                  />
+                )}
               </div>
             </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-1 space-y-4">
-              <div className="bg-slate-800 rounded-lg p-3 sm:p-4">
-                <Dialpad
-                  onDial={handlePSTNDial}
-                  onHangup={handlePSTNHangup}
-                  isDialing={isPSTNDialing}
-                  callStatus={pstnCallStatus}
-                  isCallActive={isPSTNCallActive}
-                  isConnected={isPSTNConnected}
-                />
-              </div>
-
+            <div className="lg:col-span-1">
               <div className="bg-slate-800 rounded-lg p-3 sm:p-4">
                 {userId && (
                   <CallHistory
