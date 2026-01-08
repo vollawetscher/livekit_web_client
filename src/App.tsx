@@ -138,9 +138,16 @@ function MainApp() {
     await callInvitationServiceRef.current.start();
 
     callInvitationServiceRef.current.onInvitation((invitation) => {
-      console.log('onInvitation callback received:', invitation);
+      console.log('onInvitation callback received:', {
+        invitation,
+        caller_user_id: invitation.caller_user_id,
+        callee_user_id: invitation.callee_user_id,
+        status: invitation.status,
+        currentUserId: userId,
+      });
 
       if (invitation.callee_user_id === userId) {
+        console.log('This is an incoming invitation for me');
         if (invitation.status === 'pending') {
           setIncomingInvitation(invitation);
 
@@ -160,7 +167,7 @@ function MainApp() {
       }
 
       if (invitation.caller_user_id === userId) {
-        console.log('Invitation is from current user, status:', invitation.status);
+        console.log('This is MY outgoing invitation, status:', invitation.status);
         if (invitation.status === 'accepted') {
           console.log('Calling handleOutgoingCallAccepted');
           handleOutgoingCallAccepted(invitation);
