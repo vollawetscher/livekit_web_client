@@ -108,6 +108,24 @@ function MainApp() {
     }
   }, [livekitRoom]);
 
+  useEffect(() => {
+    if (incomingInvitation) {
+      startRingtone();
+    } else {
+      stopRingtone();
+    }
+    return () => stopRingtone();
+  }, [incomingInvitation]);
+
+  useEffect(() => {
+    if (outgoingInvitation) {
+      startRingtone();
+    } else {
+      stopRingtone();
+    }
+    return () => stopRingtone();
+  }, [outgoingInvitation]);
+
   const initializeServices = async (userId: string) => {
     presenceManagerRef.current = new PresenceManager(userId);
     await presenceManagerRef.current.start();
@@ -318,6 +336,8 @@ function MainApp() {
   };
 
   const handleOutgoingCallAccepted = async (invitation: CallInvitation) => {
+    stopRingtone();
+
     setOutgoingInvitation(null);
     setOutgoingCalleeId(null);
     setIsInCall(true);
@@ -337,6 +357,8 @@ function MainApp() {
   const handleRemoteParticipantConnected = async (participantIdentity: string, participantName: string) => {
     if (!participantIdentity.startsWith('sip-') && outgoingInvitation) {
       console.log('Remote participant connected during outgoing call, transitioning to in-call state');
+
+      stopRingtone();
 
       const invitationId = outgoingInvitation.id;
 
@@ -370,6 +392,8 @@ function MainApp() {
 
   const handleAcceptCall = async () => {
     if (!incomingInvitation || !callInvitationServiceRef.current) return;
+
+    stopRingtone();
 
     try {
       const result = await callInvitationServiceRef.current.acceptCall(incomingInvitation.id);
@@ -453,6 +477,8 @@ function MainApp() {
   const handleRejectCall = async () => {
     if (!incomingInvitation || !callInvitationServiceRef.current) return;
 
+    stopRingtone();
+
     try {
       await callInvitationServiceRef.current.rejectCall(incomingInvitation.id);
       setIncomingInvitation(null);
@@ -463,6 +489,8 @@ function MainApp() {
 
   const handleCancelOutgoingCall = async () => {
     if (!outgoingInvitation || !callInvitationServiceRef.current) return;
+
+    stopRingtone();
 
     try {
       await callInvitationServiceRef.current.cancelCall(outgoingInvitation.id);
