@@ -25,6 +25,7 @@ export function isMediaWorker(participant: Participant): boolean {
   const name = participant.name?.toLowerCase() || '';
 
   return (
+    identity.startsWith('worker-') ||
     identity.includes('agent') ||
     identity.includes('transcription') ||
     identity.includes('recorder') ||
