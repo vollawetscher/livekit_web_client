@@ -3,6 +3,7 @@ import { Bell, BellOff, LogOut, Phone as PhoneIcon } from 'lucide-react';
 import { Room } from 'livekit-client';
 import { useAuth } from './contexts/AuthContext';
 import AuthScreen from './components/AuthScreen';
+import Dialpad from './components/Dialpad';
 import UnifiedContacts from './components/UnifiedContacts';
 import PhoneContactModal from './components/PhoneContactModal';
 import CallHistory from './components/CallHistory';
@@ -994,7 +995,18 @@ function MainApp() {
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1 space-y-4">
+              {isPSTNConnected && (
+                <Dialpad
+                  onDial={handlePSTNDial}
+                  onHangup={handlePSTNHangup}
+                  isDialing={isPSTNDialing}
+                  callStatus={pstnCallStatus}
+                  isCallActive={isPSTNCallActive}
+                  isConnected={isPSTNConnected}
+                />
+              )}
+
               <div className="bg-slate-800 rounded-lg p-3 sm:p-4">
                 {userId && (
                   <CallHistory
