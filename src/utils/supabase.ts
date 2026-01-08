@@ -27,6 +27,10 @@ export interface CallHistoryRecord {
   call_type?: 'webrtc' | 'pstn';
   callee_identifier?: string;
   user_id?: string;
+  callee_user_id?: string;
+  session_id?: string;
+  duration_seconds?: number;
+  direction?: 'incoming' | 'outgoing';
 }
 
 export interface PhoneContact {

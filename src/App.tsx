@@ -9,6 +9,8 @@ import Dialpad from './components/Dialpad';
 import CallHistory from './components/CallHistory';
 import IncomingCallDialog from './components/IncomingCallDialog';
 import VideoGrid from './components/VideoGrid';
+import ParticipantNotification from './components/ParticipantNotification';
+import MediaWorkerBadge from './components/MediaWorkerBadge';
 import { PresenceManager } from './utils/PresenceManager';
 import { NotificationManager } from './utils/NotificationManager';
 import { CallInvitationService } from './utils/CallInvitationService';
@@ -16,6 +18,8 @@ import { LiveKitClient, CallStatusEvent } from './utils/LiveKitClient';
 import { DialService } from './utils/DialService';
 import { TokenManager } from './utils/TokenManager';
 import { AudioRecorder } from './utils/AudioRecorder';
+import { detectMediaWorkers, MediaWorker } from './utils/MediaWorkerDetector';
+import { logWebRTCCallStart, logWebRTCCallEnd, logIncomingWebRTCCall } from './utils/WebRTCCallLogger';
 import { CallInvitation, getUserProfile, supabase, insertCallHistory, updateCallHistory, PhoneContact, getCallSessionByInvitationId } from './utils/supabase';
 
 function MainApp() {
@@ -43,6 +47,14 @@ function MainApp() {
   const [showPhoneContactModal, setShowPhoneContactModal] = useState(false);
   const [editingPhoneContact, setEditingPhoneContact] = useState<PhoneContact | undefined>(undefined);
 
+  const [humanParticipantCount, setHumanParticipantCount] = useState(0);
+  const [totalParticipantCount, setTotalParticipantCount] = useState(0);
+  const [aloneStartTime, setAloneStartTime] = useState<number | null>(null);
+  const [participantLeftName, setParticipantLeftName] = useState<string | null>(null);
+  const [mediaWorkers, setMediaWorkers] = useState<MediaWorker[]>([]);
+  const [callStartTime, setCallStartTime] = useState<number | null>(null);
+  const [currentCallHistoryId, setCurrentCallHistoryId] = useState<string | null>(null);
+
   const presenceManagerRef = useRef<PresenceManager | null>(null);
   const notificationManagerRef = useRef<NotificationManager | null>(null);
   const callInvitationServiceRef = useRef<CallInvitationService | null>(null);
@@ -65,6 +77,36 @@ function MainApp() {
       void cleanup();
     };
   }, [userId]);
+
+  useEffect(() => {
+    if (humanParticipantCount === 1 && isInCall && callType === 'webrtc') {
+      setAloneStartTime(Date.now());
+      const timer = setTimeout(() => {
+        alert('No other participants joined. Ending call.');
+        handleEndCall();
+      }, 30000);
+      return () => clearTimeout(timer);
+    } else {
+      setAloneStartTime(null);
+    }
+  }, [humanParticipantCount, isInCall, callType]);
+
+  useEffect(() => {
+    if (livekitRoom) {
+      const updateMediaWorkers = () => {
+        const participants = Array.from(livekitRoom.remoteParticipants.values());
+        const workers = detectMediaWorkers(participants);
+        setMediaWorkers(workers);
+      };
+
+      updateMediaWorkers();
+
+      const interval = setInterval(updateMediaWorkers, 2000);
+      return () => clearInterval(interval);
+    } else {
+      setMediaWorkers([]);
+    }
+  }, [livekitRoom]);
 
   const initializeServices = async (userId: string) => {
     presenceManagerRef.current = new PresenceManager(userId);
@@ -292,7 +334,7 @@ function MainApp() {
     }
   };
 
-  const handleRemoteParticipantConnected = async (participantIdentity: string) => {
+  const handleRemoteParticipantConnected = async (participantIdentity: string, participantName: string) => {
     if (!participantIdentity.startsWith('sip-') && outgoingInvitation) {
       console.log('Remote participant connected during outgoing call, transitioning to in-call state');
 
@@ -313,6 +355,17 @@ function MainApp() {
         console.error('Failed to subscribe to call session:', error);
       }
     }
+  };
+
+  const handleRemoteParticipantDisconnected = async (participantIdentity: string, participantName: string) => {
+    console.log('Remote participant disconnected:', participantIdentity, participantName);
+    setParticipantLeftName(participantName);
+  };
+
+  const handleParticipantCountChanged = (humanCount: number, totalCount: number) => {
+    console.log('Participant count changed:', { humanCount, totalCount });
+    setHumanParticipantCount(humanCount);
+    setTotalParticipantCount(totalCount);
   };
 
   const handleAcceptCall = async () => {
@@ -337,16 +390,28 @@ function MainApp() {
         throw new Error('LiveKit URL not configured');
       }
 
+      setCallStartTime(Date.now());
+
+      if (userId && incomingInvitation.caller_user_id && result.session_id) {
+        const historyId = await logIncomingWebRTCCall({
+          userId,
+          callerUserId: incomingInvitation.caller_user_id,
+          sessionId: result.session_id,
+          invitationId: incomingInvitation.id,
+        });
+        if (historyId) {
+          setCurrentCallHistoryId(historyId);
+        }
+      }
+
       liveKitClientRef.current = new LiveKitClient(
         (msg) => console.log('[LiveKit]', msg),
         () => {},
         () => {},
         () => {},
-        (participantIdentity) => {
-          alert('The other participant has left the call.');
-          handleEndCall();
-        },
-        handleRemoteParticipantConnected
+        handleRemoteParticipantDisconnected,
+        handleRemoteParticipantConnected,
+        handleParticipantCountChanged
       );
 
       await liveKitClientRef.current.connect(livekitUrl, result.token);
@@ -415,6 +480,17 @@ function MainApp() {
   };
 
   const handleEndCall = async () => {
+    if (currentCallHistoryId && callStartTime) {
+      const durationSeconds = Math.floor((Date.now() - callStartTime) / 1000);
+      await logWebRTCCallEnd({
+        historyId: currentCallHistoryId,
+        status: 'completed',
+        durationSeconds,
+      });
+      setCurrentCallHistoryId(null);
+      setHistoryRefreshKey(prev => prev + 1);
+    }
+
     if (sessionChannelRef.current) {
       await sessionChannelRef.current.unsubscribe();
       sessionChannelRef.current = null;
@@ -439,6 +515,10 @@ function MainApp() {
     setCallRoomName(null);
     setCallSessionId(null);
     setCallType(null);
+    setCallStartTime(null);
+    setHumanParticipantCount(0);
+    setTotalParticipantCount(0);
+    setAloneStartTime(null);
 
     await presenceManagerRef.current?.setInCall(false);
   };
@@ -468,16 +548,16 @@ function MainApp() {
         throw new Error('LiveKit URL not configured');
       }
 
+      setCallStartTime(Date.now());
+
       liveKitClientRef.current = new LiveKitClient(
         (msg) => console.log('[LiveKit]', msg),
         () => {},
         () => {},
         () => {},
-        (participantIdentity) => {
-          alert('The other participant has left the call.');
-          handleEndCall();
-        },
-        handleRemoteParticipantConnected
+        handleRemoteParticipantDisconnected,
+        handleRemoteParticipantConnected,
+        handleParticipantCountChanged
       );
 
       await liveKitClientRef.current.connect(livekitUrl, caller_token);
@@ -816,17 +896,39 @@ function MainApp() {
 
         {isInCall ? (
           <div className="space-y-3 sm:space-y-4">
+            {participantLeftName && (
+              <ParticipantNotification
+                participantName={participantLeftName}
+                onClose={() => setParticipantLeftName(null)}
+              />
+            )}
+
+            {mediaWorkers.length > 0 && callType === 'webrtc' && (
+              <div className="fixed top-20 right-4 z-40 flex flex-col gap-2">
+                {mediaWorkers.map((worker) => (
+                  <MediaWorkerBadge key={worker.identity} worker={worker} />
+                ))}
+              </div>
+            )}
+
             <div className="bg-slate-800 rounded-lg p-3 sm:p-4 md:p-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-3 sm:mb-4 gap-2 sm:gap-0">
                 <h2 className="text-lg sm:text-xl font-semibold">
                   In Call {callType === 'pstn' ? '(Phone)' : '(Video)'}
                 </h2>
-                <button
-                  onClick={callType === 'pstn' ? handlePSTNHangup : handleEndCall}
-                  className="w-full sm:w-auto px-4 sm:px-5 md:px-6 py-2 bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-colors text-sm sm:text-base"
-                >
-                  End Call
-                </button>
+                <div className="flex items-center gap-3">
+                  {callType === 'webrtc' && aloneStartTime && (
+                    <span className="text-sm text-amber-400">
+                      Waiting for others... ({Math.floor((Date.now() - aloneStartTime) / 1000)}s)
+                    </span>
+                  )}
+                  <button
+                    onClick={callType === 'pstn' ? handlePSTNHangup : handleEndCall}
+                    className="w-full sm:w-auto px-4 sm:px-5 md:px-6 py-2 bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-colors text-sm sm:text-base"
+                  >
+                    End Call
+                  </button>
+                </div>
               </div>
 
               <div className="bg-slate-900 rounded-lg p-2 sm:p-3 md:p-4 min-h-[300px] sm:min-h-[400px]">

@@ -31,8 +31,9 @@ export class LiveKitClient {
   private onAudioReceived?: () => void;
   private onCallStatus?: (event: CallStatusEvent) => void;
   private onStopRingtone?: () => void;
-  private onParticipantDisconnected?: (participantIdentity: string) => void;
-  private onParticipantConnected?: (participantIdentity: string) => void;
+  private onParticipantDisconnected?: (participantIdentity: string, participantName: string) => void;
+  private onParticipantConnected?: (participantIdentity: string, participantName: string) => void;
+  private onParticipantCountChanged?: (humanCount: number, totalCount: number) => void;
   private isConnected = false;
   private sessionId: string = '';
   private localAudioTrack: LocalAudioTrack | null = null;
@@ -43,8 +44,9 @@ export class LiveKitClient {
     onAudioReceived?: () => void,
     onCallStatus?: (event: CallStatusEvent) => void,
     onStopRingtone?: () => void,
-    onParticipantDisconnected?: (participantIdentity: string) => void,
-    onParticipantConnected?: (participantIdentity: string) => void
+    onParticipantDisconnected?: (participantIdentity: string, participantName: string) => void,
+    onParticipantConnected?: (participantIdentity: string, participantName: string) => void,
+    onParticipantCountChanged?: (humanCount: number, totalCount: number) => void
   ) {
     this.room = new Room();
     this.onLogMessage = onLogMessage;
@@ -53,8 +55,38 @@ export class LiveKitClient {
     this.onStopRingtone = onStopRingtone;
     this.onParticipantDisconnected = onParticipantDisconnected;
     this.onParticipantConnected = onParticipantConnected;
+    this.onParticipantCountChanged = onParticipantCountChanged;
 
     this.setupRoomListeners();
+  }
+
+  private isMediaWorker(participant: RemoteParticipant): boolean {
+    const identity = participant.identity?.toLowerCase() || '';
+    const name = participant.name?.toLowerCase() || '';
+
+    return (
+      identity.includes('agent') ||
+      identity.includes('transcription') ||
+      identity.includes('recorder') ||
+      identity.includes('media-worker') ||
+      identity.startsWith('sip-') ||
+      name.includes('agent') ||
+      name.includes('transcription') ||
+      name.includes('recorder') ||
+      name.includes('sip')
+    );
+  }
+
+  private updateParticipantCount(): void {
+    if (!this.onParticipantCountChanged) return;
+
+    const participants = this.getParticipants();
+    const humanParticipants = participants.filter(p => !this.isMediaWorker(p));
+
+    const humanCount = humanParticipants.length + 1;
+    const totalCount = participants.length + 1;
+
+    this.onParticipantCountChanged(humanCount, totalCount);
   }
 
   private setupRoomListeners(): void {
@@ -62,6 +94,7 @@ export class LiveKitClient {
       console.log('✅ Connected to LiveKit room');
       this.onLogMessage('Connected to LiveKit room');
       this.isConnected = true;
+      this.updateParticipantCount();
     });
 
     this.room.on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
@@ -159,12 +192,19 @@ export class LiveKitClient {
     this.room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
       console.log('👤 Participant connected:', participant.identity, 'metadata:', participant.metadata);
       this.onLogMessage(`Participant joined: ${participant.identity}`);
-      if (participant.identity.startsWith('sip-')) {
-        this.onLogMessage(`🔔 SIP participant connected (call may be ringing)`);
-        console.log('SIP participant metadata:', participant.metadata);
+
+      this.updateParticipantCount();
+
+      if (this.isMediaWorker(participant)) {
+        if (participant.identity.startsWith('sip-')) {
+          this.onLogMessage(`🔔 SIP participant connected (call may be ringing)`);
+          console.log('SIP participant metadata:', participant.metadata);
+        } else {
+          console.log('Media worker connected:', participant.identity);
+        }
       } else {
         if (this.onParticipantConnected) {
-          this.onParticipantConnected(participant.identity);
+          this.onParticipantConnected(participant.identity, participant.name || participant.identity);
         }
       }
     });
@@ -172,26 +212,32 @@ export class LiveKitClient {
     this.room.on(RoomEvent.ParticipantDisconnected, (participant: RemoteParticipant) => {
       console.log('👤 Participant disconnected:', participant.identity);
 
-      if (participant.identity.startsWith('sip-')) {
-        this.onLogMessage(`SIP participant left room: ${participant.identity}`);
+      this.updateParticipantCount();
 
-        const metadata = participant.metadata ? JSON.parse(participant.metadata) : {};
-        if (metadata.callId && metadata.phoneNumber) {
-          if (this.onCallStatus) {
-            this.onCallStatus({
-              event: 'call-status',
-              status: 'completed',
-              callId: metadata.callId,
-              phoneNumber: metadata.phoneNumber,
-              timestamp: Date.now(),
-              sipParticipantId: participant.identity,
-            });
+      if (this.isMediaWorker(participant)) {
+        if (participant.identity.startsWith('sip-')) {
+          this.onLogMessage(`SIP participant left room: ${participant.identity}`);
+
+          const metadata = participant.metadata ? JSON.parse(participant.metadata) : {};
+          if (metadata.callId && metadata.phoneNumber) {
+            if (this.onCallStatus) {
+              this.onCallStatus({
+                event: 'call-status',
+                status: 'completed',
+                callId: metadata.callId,
+                phoneNumber: metadata.phoneNumber,
+                timestamp: Date.now(),
+                sipParticipantId: participant.identity,
+              });
+            }
           }
+        } else {
+          console.log('Media worker disconnected:', participant.identity);
         }
       } else {
         this.onLogMessage(`Participant left: ${participant.identity}`);
         if (this.onParticipantDisconnected) {
-          this.onParticipantDisconnected(participant.identity);
+          this.onParticipantDisconnected(participant.identity, participant.name || participant.identity);
         }
       }
     });

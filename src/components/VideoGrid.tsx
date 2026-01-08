@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { RemoteParticipant, LocalParticipant, Room, RoomEvent } from 'livekit-client';
 import VideoTile from './VideoTile';
 import { fetchUserProfiles, UserProfile } from '../utils/ProfileService';
+import { filterHumanParticipants } from '../utils/MediaWorkerDetector';
 
 interface VideoGridProps {
   room: Room | null;
@@ -20,8 +21,9 @@ export default function VideoGrid({ room, activeSpeakers }: VideoGridProps) {
 
     const updateParticipants = () => {
       const remoteParticipants = Array.from(room.remoteParticipants.values());
+      const humanRemoteParticipants = filterHumanParticipants(remoteParticipants);
       const localParticipant = room.localParticipant;
-      setParticipants([localParticipant, ...remoteParticipants]);
+      setParticipants([localParticipant, ...humanRemoteParticipants]);
     };
 
     updateParticipants();

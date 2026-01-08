@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Phone, Clock, PhoneCall, PhoneMissed, PhoneOff } from 'lucide-react';
+import { Phone, Clock, PhoneCall, PhoneMissed, PhoneOff, Video } from 'lucide-react';
 import { getCallHistory, CallHistoryRecord } from '../utils/supabase';
 
 interface CallHistoryProps {
@@ -21,7 +21,7 @@ export default function CallHistory({ onRedial, isDialing, currentCallId, refres
   const loadHistory = async () => {
     try {
       setIsLoading(true);
-      const data = await getCallHistory(20);
+      const data = await getCallHistory(30);
       setHistory(data);
     } catch (error) {
       console.error('Failed to load call history:', error);
@@ -30,20 +30,31 @@ export default function CallHistory({ onRedial, isDialing, currentCallId, refres
     }
   };
 
-  const getStatusIcon = (status: string) => {
+  const getCallTypeIcon = (callType: string) => {
+    if (callType === 'webrtc') {
+      return <Video className="w-4 h-4" />;
+    }
+    return <Phone className="w-4 h-4" />;
+  };
+
+  const getStatusIcon = (status: string, callType: string) => {
+    const Icon = callType === 'webrtc' ? Video : Phone;
+
     switch (status) {
       case 'answered':
       case 'in-progress':
       case 'completed':
-        return <PhoneCall className="w-4 h-4 text-green-400" />;
+        return <Icon className="w-4 h-4 text-green-400" />;
       case 'ringing':
-        return <Phone className="w-4 h-4 text-blue-400 animate-pulse" />;
+        return <Icon className="w-4 h-4 text-blue-400 animate-pulse" />;
       case 'failed':
       case 'busy':
       case 'no-answer':
         return <PhoneMissed className="w-4 h-4 text-red-400" />;
       case 'initiated':
-        return <Phone className="w-4 h-4 text-yellow-400" />;
+        return <Icon className="w-4 h-4 text-yellow-400" />;
+      case 'cancelled':
+        return <PhoneOff className="w-4 h-4 text-slate-400" />;
       default:
         return <PhoneOff className="w-4 h-4 text-slate-400" />;
     }
@@ -82,6 +93,16 @@ export default function CallHistory({ onRedial, isDialing, currentCallId, refres
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays < 7) return `${diffDays}d ago`;
     return date.toLocaleDateString();
+  };
+
+  const formatDuration = (seconds?: number) => {
+    if (!seconds || seconds === 0) return '';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    if (mins > 0) {
+      return `${mins}m ${secs}s`;
+    }
+    return `${secs}s`;
   };
 
   const handleRedial = (record: CallHistoryRecord) => {
@@ -138,7 +159,7 @@ export default function CallHistory({ onRedial, isDialing, currentCallId, refres
                 >
                   <div className="flex items-center gap-2">
                     <div className="flex-shrink-0">
-                      {getStatusIcon(record.status)}
+                      {getStatusIcon(record.status, record.call_type || 'pstn')}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
@@ -153,9 +174,16 @@ export default function CallHistory({ onRedial, isDialing, currentCallId, refres
                         <p className="text-xs text-slate-300 font-mono truncate">
                           {record.phone_number}
                         </p>
-                        <p className={`text-[10px] font-medium flex-shrink-0 capitalize ${getStatusColor(record.status)}`}>
-                          {record.status}
-                        </p>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {record.duration_seconds && record.duration_seconds > 0 && (
+                            <span className="text-[10px] text-slate-400">
+                              {formatDuration(record.duration_seconds)}
+                            </span>
+                          )}
+                          <p className={`text-[10px] font-medium capitalize ${getStatusColor(record.status)}`}>
+                            {record.status}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
