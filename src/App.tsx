@@ -943,15 +943,14 @@ function MainApp() {
                 />
               )}
 
-              {mediaWorkers.length > 0 && callType === 'webrtc' && (
-                <div className="fixed top-20 right-4 z-40 flex flex-col gap-2">
-                  {mediaWorkers.map((worker) => (
-                    <MediaWorkerBadge key={worker.identity} worker={worker} />
-                  ))}
-                </div>
-              )}
-
               <div className="bg-slate-800 rounded-lg p-3 sm:p-4 md:p-6">
+                {mediaWorkers.length > 0 && callType === 'webrtc' && (
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {mediaWorkers.map((worker) => (
+                      <MediaWorkerBadge key={worker.identity} worker={worker} />
+                    ))}
+                  </div>
+                )}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-3 sm:mb-4 gap-2 sm:gap-0">
                   <h2 className="text-lg sm:text-xl font-semibold">
                     In Call {callType === 'pstn' ? '(Phone)' : '(Video)'}
