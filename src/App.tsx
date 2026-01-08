@@ -95,7 +95,13 @@ function MainApp() {
     if (livekitRoom) {
       const updateMediaWorkers = () => {
         const participants = Array.from(livekitRoom.remoteParticipants.values());
+        console.log('Checking for media workers. Participants:', participants.map(p => ({
+          identity: p.identity,
+          name: p.name,
+          metadata: p.metadata
+        })));
         const workers = detectMediaWorkers(participants);
+        console.log('Detected media workers:', workers);
         setMediaWorkers(workers);
       };
 
