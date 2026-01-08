@@ -18,7 +18,7 @@ export default function ParticipantNotification({ participantName, onClose }: Pa
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [onClose]);
+  }, []);
 
   return (
     <div
