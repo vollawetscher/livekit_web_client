@@ -1,12 +1,14 @@
 export class TokenManager {
   private userId: string;
+  private organizationId: string | null;
   private deviceId: string;
   private currentToken: string | null = null;
   private tokenExpiry: number | null = null;
   private currentRoomName: string | null = null;
 
-  constructor(userId: string = 'web-user', deviceId?: string) {
+  constructor(userId: string = 'web-user', organizationId: string | null = null, deviceId?: string) {
     this.userId = userId;
+    this.organizationId = organizationId;
     this.deviceId = deviceId || this.generateDeviceId();
   }
 
@@ -65,17 +67,23 @@ export class TokenManager {
 
     const tokenUrl = `${supabaseUrl}/functions/v1/generate-livekit-token`;
 
+    const requestBody: Record<string, string> = {
+      roomName: roomName,
+      participantIdentity: this.deviceId,
+      participantName: this.userId,
+    };
+
+    if (this.organizationId) {
+      requestBody.organizationId = this.organizationId;
+    }
+
     const response = await fetch(tokenUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${supabaseKey}`,
       },
-      body: JSON.stringify({
-        roomName: roomName,
-        participantIdentity: this.deviceId,
-        participantName: this.userId,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {

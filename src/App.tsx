@@ -23,7 +23,7 @@ import { logWebRTCCallStart, logWebRTCCallEnd, logIncomingWebRTCCall } from './u
 import { CallInvitation, getUserProfile, supabase, insertCallHistory, updateCallHistory, PhoneContact, getCallSessionByInvitationId } from './utils/supabase';
 
 function MainApp() {
-  const { userId, logout } = useAuth();
+  const { userId, organizationId, logout } = useAuth();
   const [incomingInvitation, setIncomingInvitation] = useState<CallInvitation | null>(null);
   const [outgoingInvitation, setOutgoingInvitation] = useState<CallInvitation | null>(null);
   const [outgoingCalleeId, setOutgoingCalleeId] = useState<string | null>(null);
@@ -76,7 +76,7 @@ function MainApp() {
     return () => {
       void cleanup();
     };
-  }, [userId]);
+  }, [userId, organizationId]);
 
   useEffect(() => {
     if (humanParticipantCount === 1 && isInCall && callType === 'webrtc') {
@@ -193,7 +193,7 @@ function MainApp() {
 
     const liveKitUrl = import.meta.env.VITE_LIVEKIT_URL;
     if (liveKitUrl) {
-      tokenManagerRef.current = new TokenManager(userId);
+      tokenManagerRef.current = new TokenManager(userId, organizationId);
     }
   };
 

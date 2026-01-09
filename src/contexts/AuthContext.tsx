@@ -3,6 +3,7 @@ import { supabase } from '../utils/supabase';
 
 interface AuthContextType {
   userId: string | null;
+  organizationId: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -14,16 +15,19 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [userId, setUserId] = useState<string | null>(null);
+  const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     checkAuth();
 
-    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         setUserId(session.user.id);
+        await fetchOrganizationId(session.user.id);
       } else {
         setUserId(null);
+        setOrganizationId(null);
       }
     });
 
@@ -32,11 +36,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const fetchOrganizationId = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Failed to fetch organization:', error);
+        return;
+      }
+
+      if (data) {
+        setOrganizationId(data.organization_id);
+      }
+    } catch (error) {
+      console.error('Error fetching organization:', error);
+    }
+  };
+
   const checkAuth = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         setUserId(session.user.id);
+        await fetchOrganizationId(session.user.id);
       }
     } catch (error) {
       console.error('Auth check failed:', error);
@@ -59,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error;
     if (data.user) {
       setUserId(data.user.id);
+      await fetchOrganizationId(data.user.id);
     }
   };
 
@@ -71,18 +98,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error;
     if (data.user) {
       setUserId(data.user.id);
+      await fetchOrganizationId(data.user.id);
     }
   };
 
   const logout = async () => {
     await supabase.auth.signOut();
     setUserId(null);
+    setOrganizationId(null);
   };
 
   return (
     <AuthContext.Provider
       value={{
         userId,
+        organizationId,
         isAuthenticated: !!userId,
         isLoading,
         login,

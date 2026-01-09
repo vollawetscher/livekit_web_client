@@ -54,9 +54,24 @@ Deno.serve(async (req: Request) => {
       .eq('user_id', callee_user_id)
       .maybeSingle();
 
+    const { data: callerOrgData } = await supabase
+      .from('organization_members')
+      .select('organization_id')
+      .eq('user_id', caller_user_id)
+      .maybeSingle();
+
+    const metadata: Record<string, string> = {
+      created_by: caller_user_id,
+    };
+
+    if (callerOrgData?.organization_id) {
+      metadata.organization_id = callerOrgData.organization_id;
+    }
+
     const callerToken = new AccessToken(livekitApiKey, livekitApiSecret, {
       identity: caller_user_id,
       name: caller_display_name || caller_user_id,
+      metadata: JSON.stringify(metadata),
     });
     callerToken.addGrant({
       roomJoin: true,
@@ -68,6 +83,7 @@ Deno.serve(async (req: Request) => {
     const calleeToken = new AccessToken(livekitApiKey, livekitApiSecret, {
       identity: callee_user_id,
       name: calleeProfile?.display_name || callee_user_id,
+      metadata: JSON.stringify(metadata),
     });
     calleeToken.addGrant({
       roomJoin: true,

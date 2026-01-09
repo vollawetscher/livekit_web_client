@@ -11,6 +11,7 @@ interface TokenRequest {
   roomName: string;
   participantIdentity: string;
   participantName?: string;
+  organizationId?: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -29,7 +30,7 @@ Deno.serve(async (req: Request) => {
       throw new Error("LiveKit credentials not configured");
     }
 
-    const { roomName, participantIdentity, participantName }: TokenRequest = await req.json();
+    const { roomName, participantIdentity, participantName, organizationId }: TokenRequest = await req.json();
 
     if (!roomName || !participantIdentity) {
       return new Response(
@@ -44,9 +45,18 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const metadata: Record<string, string> = {
+      created_by: participantIdentity,
+    };
+
+    if (organizationId) {
+      metadata.organization_id = organizationId;
+    }
+
     const at = new AccessToken(apiKey, apiSecret, {
       identity: participantIdentity,
       name: participantName || participantIdentity,
+      metadata: JSON.stringify(metadata),
     });
 
     at.addGrant({
