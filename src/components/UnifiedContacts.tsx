@@ -41,7 +41,9 @@ export default function UnifiedContacts({
 
   useEffect(() => {
     loadContacts();
+  }, [currentUserId]);
 
+  useEffect(() => {
     let channelSubscription: any = null;
     let pollingInterval: number | null = null;
 
@@ -63,7 +65,8 @@ export default function UnifiedContacts({
 
     const refreshPresence = async () => {
       try {
-        const users = webContacts.filter(u => u.user_id !== currentUserId);
+        const allUsers = await getAllUsers();
+        const users = allUsers.filter(u => u.user_id !== currentUserId);
         if (users.length === 0) return;
 
         const presences = await Promise.all(
@@ -102,7 +105,7 @@ export default function UnifiedContacts({
         clearInterval(pollingInterval);
       }
     };
-  }, [currentUserId, webContacts]);
+  }, [currentUserId]);
 
   const loadContacts = async () => {
     try {
