@@ -43,25 +43,66 @@ export default function UnifiedContacts({
     loadContacts();
 
     let channelSubscription: any = null;
+    let pollingInterval: number | null = null;
 
     const setupSubscription = async () => {
-      channelSubscription = await subscribeToPresence((presence) => {
+      try {
+        channelSubscription = await subscribeToPresence((presence) => {
+          console.log('[UnifiedContacts] Received presence update:', presence);
+          setPresenceMap(prev => {
+            const updated = new Map(prev);
+            updated.set(presence.user_id, presence);
+            return updated;
+          });
+        });
+        console.log('[UnifiedContacts] Presence subscription established, channel state:', channelSubscription?.state);
+      } catch (error) {
+        console.error('[UnifiedContacts] Failed to subscribe to presence:', error);
+      }
+    };
+
+    const refreshPresence = async () => {
+      try {
+        const users = webContacts.filter(u => u.user_id !== currentUserId);
+        if (users.length === 0) return;
+
+        const presences = await Promise.all(
+          users.map(c => getUserPresence(c.user_id))
+        );
+
         setPresenceMap(prev => {
           const updated = new Map(prev);
-          updated.set(presence.user_id, presence);
+          presences.forEach((presence, idx) => {
+            if (presence) {
+              const existing = prev.get(users[idx].user_id);
+              if (!existing || new Date(presence.updated_at) > new Date(existing.updated_at)) {
+                console.log('[UnifiedContacts] Presence refreshed for:', users[idx].user_id, presence.status);
+                updated.set(users[idx].user_id, presence);
+              }
+            }
+          });
           return updated;
         });
-      });
+      } catch (error) {
+        console.error('[UnifiedContacts] Failed to refresh presence:', error);
+      }
     };
 
     setupSubscription();
+
+    pollingInterval = window.setInterval(() => {
+      refreshPresence();
+    }, 10000);
 
     return () => {
       if (channelSubscription && typeof channelSubscription.unsubscribe === 'function') {
         channelSubscription.unsubscribe();
       }
+      if (pollingInterval !== null) {
+        clearInterval(pollingInterval);
+      }
     };
-  }, [currentUserId]);
+  }, [currentUserId, webContacts]);
 
   const loadContacts = async () => {
     try {
@@ -113,8 +154,26 @@ export default function UnifiedContacts({
     }
   };
 
-  const getStatusColor = (status?: string) => {
-    switch (status) {
+  const getEffectiveStatus = (presence?: UserPresence): string => {
+    if (!presence) return 'offline';
+
+    const lastSeenTime = new Date(presence.last_seen_at).getTime();
+    const now = Date.now();
+    const secondsSinceLastSeen = (now - lastSeenTime) / 1000;
+
+    if (secondsSinceLastSeen > 90) {
+      return 'offline';
+    }
+
+    if (presence.status === 'online' && secondsSinceLastSeen > 60) {
+      return 'away';
+    }
+
+    return presence.status;
+  };
+
+  const getStatusColor = (effectiveStatus: string) => {
+    switch (effectiveStatus) {
       case 'online': return 'bg-green-500';
       case 'in_call': return 'bg-red-500';
       case 'away': return 'bg-yellow-500';
@@ -123,8 +182,8 @@ export default function UnifiedContacts({
     }
   };
 
-  const getStatusText = (status?: string) => {
-    switch (status) {
+  const getStatusText = (effectiveStatus: string) => {
+    switch (effectiveStatus) {
       case 'online': return 'Online';
       case 'in_call': return 'In Call';
       case 'away': return 'Away';
@@ -200,7 +259,8 @@ export default function UnifiedContacts({
           ) : (
             filteredWebContacts.map((contact) => {
               const presence = presenceMap.get(contact.user_id);
-              const isInCall = presence?.status === 'in_call';
+              const effectiveStatus = getEffectiveStatus(presence);
+              const isInCall = effectiveStatus === 'in_call';
               const isCalling = outgoingCalleeId === contact.user_id;
 
               return (
@@ -213,11 +273,11 @@ export default function UnifiedContacts({
                       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
                         <User className="w-5 h-5 text-white" />
                       </div>
-                      <div className={`absolute bottom-0 right-0 w-3 h-3 ${getStatusColor(presence?.status)} border-2 border-slate-700 rounded-full`} />
+                      <div className={`absolute bottom-0 right-0 w-3 h-3 ${getStatusColor(effectiveStatus)} border-2 border-slate-700 rounded-full`} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-white truncate">{contact.display_name}</p>
-                      <p className="text-xs text-slate-400">{getStatusText(presence?.status)}</p>
+                      <p className="text-xs text-slate-400">{getStatusText(effectiveStatus)}</p>
                     </div>
                   </div>
                   <button

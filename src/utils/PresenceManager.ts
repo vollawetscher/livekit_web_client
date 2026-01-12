@@ -5,24 +5,42 @@ export class PresenceManager {
   private heartbeatInterval: number | null = null;
   private channel: any = null;
   private onPresenceUpdateCallbacks: ((presence: UserPresence) => void)[] = [];
+  private visibilityTimeout: number | null = null;
+  private reconnectTimer: number | null = null;
+  private isRunning: boolean = false;
 
   constructor(userId: string) {
     this.userId = userId;
   }
 
   async start() {
-    console.log('PresenceManager: Starting for user:', this.userId);
+    console.log('[PresenceManager] Starting for user:', this.userId);
+    this.isRunning = true;
     await this.updateStatus('online');
-    console.log('PresenceManager: Initial status set to online');
+    console.log('[PresenceManager] Initial status set to online');
     this.startHeartbeat();
-    console.log('PresenceManager: Heartbeat started');
+    console.log('[PresenceManager] Heartbeat started');
     await this.subscribeToPresenceUpdates();
-    console.log('PresenceManager: Subscribed to presence updates');
+    console.log('[PresenceManager] Subscribed to presence updates');
     this.setupVisibilityHandlers();
-    console.log('PresenceManager: Visibility handlers setup complete');
+    this.startConnectionMonitoring();
+    console.log('[PresenceManager] Setup complete');
   }
 
   async stop() {
+    console.log('[PresenceManager] Stopping');
+    this.isRunning = false;
+
+    if (this.visibilityTimeout !== null) {
+      clearTimeout(this.visibilityTimeout);
+      this.visibilityTimeout = null;
+    }
+
+    if (this.reconnectTimer !== null) {
+      clearInterval(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
     await this.updateStatus('offline');
     this.stopHeartbeat();
     if (this.channel) {
@@ -61,16 +79,54 @@ export class PresenceManager {
   }
 
   private async subscribeToPresenceUpdates() {
-    this.channel = await subscribeToPresence((presence) => {
-      this.onPresenceUpdateCallbacks.forEach(callback => callback(presence));
-    });
+    try {
+      this.channel = await subscribeToPresence((presence) => {
+        console.log('[PresenceManager] Received presence update:', presence);
+        this.onPresenceUpdateCallbacks.forEach(callback => callback(presence));
+      });
+      console.log('[PresenceManager] Channel subscribed, state:', this.channel?.state);
+    } catch (error) {
+      console.error('[PresenceManager] Failed to subscribe to presence:', error);
+      throw error;
+    }
+  }
+
+  private startConnectionMonitoring() {
+    if (this.reconnectTimer !== null) {
+      clearInterval(this.reconnectTimer);
+    }
+
+    this.reconnectTimer = window.setInterval(() => {
+      if (!this.isRunning) return;
+
+      const state = this.channel?.state;
+      console.log('[PresenceManager] Channel state:', state);
+
+      if (state === 'closed' || !this.channel) {
+        console.warn('[PresenceManager] Channel closed, reconnecting...');
+        this.subscribeToPresenceUpdates().catch(err =>
+          console.error('[PresenceManager] Reconnection failed:', err)
+        );
+      }
+    }, 15000);
   }
 
   private setupVisibilityHandlers() {
     const handleVisibilityChange = () => {
+      if (this.visibilityTimeout !== null) {
+        clearTimeout(this.visibilityTimeout);
+        this.visibilityTimeout = null;
+      }
+
       if (document.hidden) {
-        this.updateStatus('away');
+        console.log('[PresenceManager] Tab hidden, scheduling away status in 60s');
+        this.visibilityTimeout = window.setTimeout(() => {
+          console.log('[PresenceManager] Setting status to away after 60s hidden');
+          this.updateStatus('away');
+          this.visibilityTimeout = null;
+        }, 60000);
       } else {
+        console.log('[PresenceManager] Tab visible, setting status to online');
         this.updateStatus('online');
       }
     };
